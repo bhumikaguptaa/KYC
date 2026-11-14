@@ -29,7 +29,6 @@ export function VideoEmbed({ id, title }: { id: string; title: string }) {
         src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${q}`}
         title={title}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
       />
     );

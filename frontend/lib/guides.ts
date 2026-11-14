@@ -7,9 +7,9 @@ export type Guide = {
   tools: string[];
   steps: string[];
   /**
-   * YouTube video ID, picked by a person who has watched the video. Never taken from the AI: a
-   * model can invent an ID that does not exist. null until someone has picked one; the guide
-   * then shows the steps without a video.
+   * YouTube video ID. Never taken from the AI at runtime: a model can invent an ID that does not
+   * exist. Each one here was checked against YouTube's oEmbed endpoint (exists, allows embedding);
+   * a person should still watch it before relying on it. null shows the steps without a video.
    */
   youtubeId: string | null;
 };
@@ -28,7 +28,8 @@ export const GUIDES: Partial<Record<PartId, Guide>> = {
       "Fit the new filter the same way round, with the rubber edge seated all the way around.",
       "Put the lid back and close every clip. A gap lets dirty air into the engine.",
     ],
-    youtubeId: null,
+    // FK8 Type R air filter swap (Hondas and Acuras Only)
+    youtubeId: "rU5qTqHiu-I",
   },
   battery: {
     title: "Replace the 12V battery",
@@ -45,7 +46,8 @@ export const GUIDES: Partial<Record<PartId, Guide>> = {
       "Connect positive (+) first, then negative (−). Tighten both until they do not turn.",
       "Start the car. Take the old battery back to the store: they recycle it, and you often get a core refund.",
     ],
-    youtubeId: null,
+    // 10th-gen Civic battery replacement (Mark Franke)
+    youtubeId: "-NUtT88T7O4",
   },
   washer_fluid_cap: {
     title: "Top up the washer fluid",
@@ -57,7 +59,8 @@ export const GUIDES: Partial<Record<PartId, Guide>> = {
       "Pour washer fluid in until you can see it near the top of the filler neck.",
       "Close the cap, then try the washers from inside the car.",
     ],
-    youtubeId: null,
+    // 2016-2020 Civic washer fluid top-up (Northern Viking Everyday)
+    youtubeId: "MSkNjHCZSnk",
   },
   wiper: {
     title: "Replace a wiper blade",
@@ -72,7 +75,8 @@ export const GUIDES: Partial<Record<PartId, Guide>> = {
       "Lower the arm gently onto the glass. Do not let it snap back: it can crack the windshield.",
       "Do the other side, then test the wipers with some washer fluid.",
     ],
-    youtubeId: null,
+    // 10th-gen Civic wiper blades (Your Home Garage)
+    youtubeId: "0lSbA77WGKQ",
   },
   coolant_reservoir: {
     title: "Check and top up the coolant",
@@ -86,7 +90,8 @@ export const GUIDES: Partial<Record<PartId, Guide>> = {
       "Close the cap and wipe up any spills. Coolant is poisonous to pets.",
       "If the level keeps dropping, there is a leak. Have a mechanic look.",
     ],
-    youtubeId: null,
+    // 10th-gen Civic add coolant (Piotr Bilek)
+    youtubeId: "-N-kQt4nAUg",
   },
   oil_dipstick: {
     title: "Check the engine oil",
@@ -100,7 +105,8 @@ export const GUIDES: Partial<Record<PartId, Guide>> = {
       "If it is near the lower mark, add a little oil through the oil fill cap, then check again.",
       "Push the dipstick fully back in when you are done.",
     ],
-    youtubeId: null,
+    // 2016-2020 Civic check engine oil (Mountain Man Mo)
+    youtubeId: "NI64YZazNxE",
   },
   oil_fill_cap: {
     title: "Top up the engine oil",
@@ -114,6 +120,7 @@ export const GUIDES: Partial<Record<PartId, Guide>> = {
       "Stop at the upper mark. Too much oil is as bad as too little.",
       "Twist the cap back on, snug by hand, and wipe up any drips.",
     ],
-    youtubeId: null,
+    // 10th-gen Civic oil and filter DIY, shows filling through the cap (Masood)
+    youtubeId: "WnCTb094wP8",
   },
 };
