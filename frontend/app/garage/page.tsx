@@ -101,28 +101,12 @@ export default function GaragePage() {
                     ))}
                   </dl>
                 )}
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="flex flex-1 rounded-xl bg-white/5 p-1 text-sm" role="group" aria-label="Show the part">
-                    {([true, false] as const).map((solid) => (
-                      <button
-                        key={String(solid)}
-                        onClick={() => s.setSolid(solid)}
-                        aria-pressed={s.solid === solid}
-                        className={`flex-1 rounded-lg py-1.5 transition ${
-                          s.solid === solid ? "bg-white/15 text-white" : "text-white/55"
-                        }`}
-                      >
-                        {solid ? "Solid" : "Hollow"}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={s.recenter}
-                    className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white/75 transition active:scale-95"
-                  >
-                    Recenter
-                  </button>
-                </div>
+                <button
+                  onClick={s.recenter}
+                  className="mt-4 w-full rounded-xl bg-white/5 py-2 text-sm text-white/75 transition active:scale-[0.98]"
+                >
+                  Recenter
+                </button>
               </>
             ) : (
               <>

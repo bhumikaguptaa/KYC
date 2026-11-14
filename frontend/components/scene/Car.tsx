@@ -30,7 +30,7 @@ type HingeRig = { node: THREE.Object3D; closed: THREE.Quaternion; open: THREE.Qu
 type PartRig = {
   id: string;
   mats: THREE.MeshStandardMaterial[];
-  /** back-face fills shown in "solid" mode, so the open mesh reads as a solid object */
+  /** back-face fills shown while the part is out, so the open mesh reads as a solid object */
   caps: THREE.Mesh[];
   level: { v: number };
   /** group at the part's centre holding its meshes; moved and scaled to take the part out */
@@ -41,7 +41,7 @@ type PartRig = {
 };
 type ShellRig = { mesh: THREE.Mesh; original: THREE.Material | THREE.Material[] };
 /** How the car is drawn: its own materials, X-ray shell, or (exploring) everything but one part ghosted. */
-type Look = { xray: boolean; outId: string | null; solid: boolean };
+type Look = { xray: boolean; outId: string | null };
 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0) };
 const EXPLORE_POINT = new THREE.Vector3(...EXPLORE.point);
@@ -183,8 +183,8 @@ function buildRig(scene: THREE.Group) {
     for (const m of meshesOfPart) holder.attach(m);
     const outScale = THREE.MathUtils.clamp(EXPLORE.size / Math.max(dims.x, dims.y, dims.z), 1, 6);
 
-    // The meshes are open shells (modelled to be seen from above). A back-face-only copy drawn in a
-    // flat colour fills every view into the inside, so "solid" mode reads as a solid object.
+    // The meshes are open shells (modelled to be seen from above). Taken out, a back-face-only copy
+    // drawn in a flat colour fills every view into the inside, so the part reads as solid.
     const caps = meshesOfPart.map((m) => {
       const cap = new THREE.Mesh(m.geometry, capMat);
       cap.name = `${m.name}Cap`;
@@ -237,7 +237,7 @@ function buildRig(scene: THREE.Group) {
     ghost: createXrayMaterial(),
     lightLevel: { v: 0 },
     time: 0,
-    look: { xray: false, outId: null, solid: true } as Look,
+    look: { xray: false, outId: null } as Look,
   };
 }
 
@@ -263,7 +263,6 @@ type Pose = {
   xray: boolean;
   selected: string | null;
   glows: Record<string, Glow>;
-  solid: boolean;
 };
 
 /** The part that is taken out, if any (only parts flagged explorable come out). */
@@ -294,7 +293,7 @@ function applyLook(r: Rig, look: Look) {
     if (!prev.xray || prev.outId) r.xray.uniforms.uOpacity.value = 0;
   }
   for (const p of r.parts) {
-    const solid = p.id === look.outId && look.solid;
+    const solid = p.id === look.outId;
     for (const c of p.caps) c.visible = solid;
     for (const m of p.mats) {
       const side = solid ? THREE.FrontSide : THREE.DoubleSide;
@@ -356,8 +355,8 @@ export function Car() {
   // Tapping panels open is off while the body is glass (X-ray or exploring).
   const ghost = s.xray || outId !== null;
   useEffect(() => {
-    if (rigRef.current) applyLook(rigRef.current, { xray: s.xray, outId, solid: s.solid });
-  }, [s.xray, outId, s.solid, scene]);
+    if (rigRef.current) applyLook(rigRef.current, { xray: s.xray, outId });
+  }, [s.xray, outId, scene]);
 
   useFrame((_, dt) => {
     if (rigRef.current) animate(rigRef.current, s, Math.min(dt, 0.05));
