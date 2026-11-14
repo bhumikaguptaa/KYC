@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ContactShadows, Html, useGLTF } from "@react-three/drei";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { easing } from "maath";
 import * as THREE from "three";
 import {
   HINGES,
-  LIGHT_MATERIALS,
+  LAMP_MATERIAL,
+  LIGHT_NODES,
   MODEL_URL,
   PARTS,
   SHELL_NODES,
@@ -31,11 +32,13 @@ type ShellRig = { mesh: THREE.Mesh; original: THREE.Material | THREE.Material[] 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0) };
 const noRaycast = () => {};
 
-/** Build all the lookups once per loaded model. */
-function rig(scene: THREE.Group) {
+/** Build all the lookups for a loaded model. Mutates the scene, so it must run once per scene. */
+function buildRig(scene: THREE.Group) {
   const byName = (name: string) => scene.getObjectByName(name);
+  scene.updateMatrixWorld(true);
 
-  // Hinges: open pose = a world-axis rotation applied on top of the closed pose.
+  // Hinges: each panel is re-parented under a pivot group sitting on its hinge line, and the
+  // pivot rotates. (The model's own node origins sit at mesh centres after optimisation.)
   const hinges = {} as Record<Openable, HingeRig[]>;
   for (const key of Object.keys(HINGES) as Openable[]) {
     hinges[key] = HINGES[key].flatMap((h) => {
@@ -44,15 +47,26 @@ function rig(scene: THREE.Group) {
         console.warn(`[KYC] hinge node missing: ${h.node}`);
         return [];
       }
-      const closed = node.quaternion.clone();
+      const pivot = new THREE.Group();
+      pivot.name = `${h.node}Hinge`;
+      pivot.position.set(...h.pivot);
+      (node.parent ?? scene).add(pivot);
+      pivot.updateMatrixWorld(true);
+      for (const name of [h.node, ...("carries" in h ? h.carries : [])]) {
+        const o = byName(name);
+        if (o) pivot.attach(o);
+        else console.warn(`[KYC] hinge node missing: ${name}`);
+      }
+      const closed = pivot.quaternion.clone();
       const turn = new THREE.Quaternion().setFromAxisAngle(AXES[h.axis], THREE.MathUtils.degToRad(h.angle));
-      return [{ node, closed, open: turn.multiply(closed) }];
+      return [{ node: pivot, closed, open: turn.multiply(closed) }];
     });
   }
 
-  // Openable panels: tapping the hood or a door toggles it.
+  // Openable panels: tapping the hood, a door or the hatch toggles it.
   const openableByNode: Record<string, Openable> = {};
-  for (const key of Object.keys(HINGES) as Openable[]) for (const h of HINGES[key]) openableByNode[h.node] = key;
+  for (const key of Object.keys(HINGES) as Openable[])
+    for (const h of HINGES[key]) for (const n of [h.node, ...("carries" in h ? h.carries : [])]) openableByNode[n] = key;
 
   // Clear-coat car paint.
   const meshes: THREE.Mesh[] = [];
@@ -75,34 +89,58 @@ function rig(scene: THREE.Group) {
     for (const m of meshes) if ((m.material as THREE.Material).name === "FK8.Paint") m.material = paint;
   }
 
-  // Lights: collect emissive materials by name.
-  const lightMats = { front: [] as THREE.MeshStandardMaterial[], rear: [] as THREE.MeshStandardMaterial[] };
+  // The Blender export lost two materials' settings: tyres came out plain white, and the lamp
+  // lenses came out opaque white, hiding the lamps behind them. Restore both.
   for (const m of meshes) {
     const mat = m.material as THREE.MeshStandardMaterial;
-    for (const side of ["front", "rear"] as const) {
-      if (LIGHT_MATERIALS[side].includes(mat.name) && !lightMats[side].includes(mat)) {
-        mat.emissive = new THREE.Color(side === "front" ? "#f4f8ff" : "#ff2a2a");
-        mat.emissiveIntensity = 0;
-        lightMats[side].push(mat);
-      }
+    if (mat.name === "FK8.Tire") {
+      mat.color.set("#151517");
+      mat.roughness = 0.9;
+    } else if (mat.name === "FK8.HeadlightGlass") {
+      mat.color.set("#ffffff");
+      mat.transparent = true;
+      mat.opacity = 0.16;
+      mat.roughness = 0.05;
+      mat.metalness = 0;
+      mat.depthWrite = false;
     }
+  }
+
+  // Lights: one lamp material is shared by every light, so each side gets its own copy.
+  const lightMats = { front: [] as THREE.MeshStandardMaterial[], rear: [] as THREE.MeshStandardMaterial[] };
+  for (const side of ["front", "rear"] as const) {
+    let lamp: THREE.MeshStandardMaterial | null = null;
+    for (const name of LIGHT_NODES[side]) {
+      byName(name)?.traverse((c) => {
+        const mesh = c as THREE.Mesh;
+        if (!mesh.isMesh || (mesh.material as THREE.Material).name !== LAMP_MATERIAL) return;
+        if (!lamp) {
+          lamp = (mesh.material as THREE.MeshStandardMaterial).clone();
+          lamp.emissive = new THREE.Color(side === "front" ? "#f4f8ff" : "#ff2a2a");
+          lamp.emissiveIntensity = 0;
+          lightMats[side].push(lamp);
+        }
+        mesh.material = lamp;
+      });
+    }
+    if (!lamp) console.warn(`[KYC] no ${side} lamp meshes found`);
   }
 
   // Parts: own material copies so one part can glow without lighting up the whole engine bay.
   const parts: PartRig[] = PARTS.map((p) => {
     const mats: THREE.MeshStandardMaterial[] = [];
     scene.traverse((o) => {
-      if (!p.nodes.some((n) => o.name.startsWith(n))) return;
-      o.traverse((c) => {
-        const mesh = c as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
-        mat.emissive = new THREE.Color(0, 0, 0);
-        mat.emissiveIntensity = 1;
-        mesh.material = mat;
-        mesh.userData.partId = p.id;
-        mats.push(mat);
-      });
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || mesh.userData.partId) return;
+      // Match the mesh or its node group (multi-material nodes load as a group of meshes).
+      const owner = [mesh, mesh.parent].find((x) => x && p.nodes.some((n) => x.name.startsWith(n)));
+      if (!owner) return;
+      const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
+      mat.emissive = new THREE.Color(0, 0, 0);
+      mat.emissiveIntensity = 1;
+      mesh.material = mat;
+      mesh.userData.partId = p.id;
+      mats.push(mat);
     });
     if (!mats.length) console.warn(`[KYC] part has no meshes: ${p.id}`);
     return { id: p.id, mats, level: { v: 0 } };
@@ -121,67 +159,87 @@ function rig(scene: THREE.Group) {
       if (!mesh.isMesh) return;
       const matName = (mesh.material as THREE.Material).name;
       if (SOLID_IN_XRAY_MATERIALS.includes(matName)) return;
-      mesh.userData.openable = openableByNode[name];
       shell.push({ mesh, original: mesh.material });
     });
   }
-  // Panels outside the shell list can still be tapped open (e.g. tailgate glass is in the list too).
   for (const [nodeName, key] of Object.entries(openableByNode)) {
     byName(nodeName)?.traverse((c) => {
       if ((c as THREE.Mesh).isMesh) c.userData.openable = key;
     });
   }
 
-  return { hinges, parts, shell, lightMats };
+  return { hinges, parts, shell, lightMats, xray: createXrayMaterial(), lightLevel: { v: 0 }, time: 0 };
+}
+
+type Rig = ReturnType<typeof buildRig>;
+
+// useGLTF caches the scene across mounts, so the rig is cached with it. Re-rigging a remounted
+// scene would re-clone materials and re-parent panels that are already on their pivots.
+const rigs = new WeakMap<THREE.Object3D, Rig>();
+function rigFor(scene: THREE.Group) {
+  let r = rigs.get(scene);
+  if (!r) {
+    r = buildRig(scene);
+    rigs.set(scene, r);
+  }
+  return r;
+}
+
+/** What the frame loop reads from the UI state each frame. */
+type Pose = { open: Record<Openable, boolean>; lights: boolean; xray: boolean; selected: string | null; glows: Record<string, Glow> };
+
+/** Swap the shell between its own materials and the X-ray glass (once per toggle). */
+function applyXray(r: Rig, on: boolean) {
+  for (const { mesh, original } of r.shell) {
+    mesh.material = on ? r.xray : original;
+    mesh.raycast = on ? noRaycast : THREE.Mesh.prototype.raycast;
+  }
+  if (on) r.xray.uniforms.uOpacity.value = 0;
+}
+
+/** Ease every animated value toward the current pose. Runs once per frame. */
+function animate(r: Rig, pose: Pose, delta: number) {
+  r.time += delta;
+
+  for (const key of Object.keys(r.hinges) as Openable[])
+    for (const h of r.hinges[key]) easing.dampQ(h.node.quaternion, pose.open[key] ? h.open : h.closed, 0.32, delta);
+
+  easing.damp(r.lightLevel, "v", pose.lights ? 1 : 0, 0.18, delta);
+  for (const m of r.lightMats.front) m.emissiveIntensity = r.lightLevel.v * 6;
+  for (const m of r.lightMats.rear) m.emissiveIntensity = r.lightLevel.v * 3;
+
+  if (pose.xray) easing.damp(r.xray.uniforms.uOpacity, "value", 1, 0.25, delta);
+
+  const pulse = 0.75 + 0.25 * Math.sin(r.time * 3.2);
+  for (const p of r.parts) {
+    const glow: Glow | undefined = pose.selected === p.id ? "select" : pose.glows[p.id];
+    easing.damp(p.level, "v", glow ? 1 : 0, 0.2, delta);
+    const color = GLOW_COLORS[glow ?? "select"];
+    for (const m of p.mats) {
+      m.emissive.copy(color);
+      m.emissiveIntensity = p.level.v * pulse * 0.9;
+    }
+  }
 }
 
 export function Car() {
   const { scene } = useGLTF(MODEL_URL);
   const s = useScene();
   const { setModelReady } = s;
-  const rigged = useMemo(() => rig(scene), [scene]);
-  const xray = useMemo(() => createXrayMaterial(), []);
-  const lightLevel = useRef({ v: 0 });
-  const t = useRef(0);
+  // three.js objects are mutated imperatively (above), so the rig lives behind a ref, not in render state.
+  const rigRef = useRef<Rig | null>(null);
 
   useEffect(() => {
+    rigRef.current = rigFor(scene);
     setModelReady(true);
-  }, [setModelReady]);
+  }, [scene, setModelReady]);
 
-  // X-ray swap: materials change once per toggle; the fade happens in useFrame.
   useEffect(() => {
-    for (const { mesh, original } of rigged.shell) {
-      mesh.material = s.xray ? xray : original;
-      mesh.raycast = s.xray ? noRaycast : THREE.Mesh.prototype.raycast;
-    }
-    if (s.xray) xray.uniforms.uOpacity.value = 0;
-  }, [s.xray, rigged, xray]);
+    if (rigRef.current) applyXray(rigRef.current, s.xray);
+  }, [s.xray, scene]);
 
   useFrame((_, dt) => {
-    const delta = Math.min(dt, 0.05);
-    t.current += delta;
-
-    for (const key of Object.keys(rigged.hinges) as Openable[]) {
-      const isOpen = s.open[key];
-      for (const h of rigged.hinges[key]) easing.dampQ(h.node.quaternion, isOpen ? h.open : h.closed, 0.32, delta);
-    }
-
-    easing.damp(lightLevel.current, "v", s.lights ? 1 : 0, 0.18, delta);
-    for (const m of rigged.lightMats.front) m.emissiveIntensity = lightLevel.current.v * 6;
-    for (const m of rigged.lightMats.rear) m.emissiveIntensity = lightLevel.current.v * 3;
-
-    if (s.xray) easing.damp(xray.uniforms.uOpacity, "value", 1, 0.25, delta);
-
-    const pulse = 0.75 + 0.25 * Math.sin(t.current * 3.2);
-    for (const p of rigged.parts) {
-      const glow: Glow | undefined = s.selected === p.id ? "select" : s.glows[p.id];
-      easing.damp(p.level, "v", glow ? 1 : 0, 0.2, delta);
-      const color = GLOW_COLORS[glow ?? "select"];
-      for (const m of p.mats) {
-        m.emissive.copy(color);
-        m.emissiveIntensity = p.level.v * pulse * 0.9;
-      }
-    }
+    if (rigRef.current) animate(rigRef.current, s, Math.min(dt, 0.05));
   });
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {

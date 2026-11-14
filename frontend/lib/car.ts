@@ -25,21 +25,28 @@ export type Hinge = {
   axis: "x" | "y";
   /** opening angle in degrees, relative to the closed pose */
   angle: number;
+  /**
+   * World-space point on the hinge line. Taken from the source model's object origins, because
+   * meshopt quantization moves every node origin to its mesh's bounding-box centre.
+   */
+  pivot: Vec3;
+  /** other nodes that swing with this panel (separate meshes in the model) */
+  carries?: string[];
 };
 
 export const MODEL_URL = "/models/civic.glb";
 
 export const HINGES = {
-  hood: [{ node: "FK8Hood", axis: "x", angle: -60 }],
+  hood: [{ node: "FK8Hood", axis: "x", angle: -60, pivot: [0, 1.212, 1.161] }],
   frontDoors: [
-    { node: "FK8DoorFtL", axis: "y", angle: -62 },
-    { node: "FK8DoorFtR", axis: "y", angle: 62 },
+    { node: "FK8DoorFtL", axis: "y", angle: -62, pivot: [1.273, 1.014, 1.103] },
+    { node: "FK8DoorFtR", axis: "y", angle: 62, pivot: [-1.273, 1.014, 1.103] },
   ],
   rearDoors: [
-    { node: "FK8DoorBkL", axis: "y", angle: -60 },
-    { node: "FK8DoorBkR", axis: "y", angle: 60 },
+    { node: "FK8DoorBkL", axis: "y", angle: -60, pivot: [1.089, 1.024, -0.245] },
+    { node: "FK8DoorBkR", axis: "y", angle: 60, pivot: [-1.089, 1.024, -0.245] },
   ],
-  hatch: [{ node: "FK8Tailgate", axis: "x", angle: 75 }],
+  hatch: [{ node: "FK8Tailgate", axis: "x", angle: 75, pivot: [0, 1.668, -1.428], carries: ["FK8TailgateGlass"] }],
 } satisfies Record<string, Hinge[]>;
 
 export type Openable = keyof typeof HINGES;
@@ -73,9 +80,14 @@ export const SHELL_NODES = [
 /** Materials inside the body mesh that stay solid in X-ray (the cabin). */
 export const SOLID_IN_XRAY_MATERIALS = ["FK8.Interior", "FK8.Interiorlights"];
 
-export const LIGHT_MATERIALS = {
-  front: ["FK8.Headlight", "FK8.RunningLight", "FK8.HighBeam"],
-  rear: ["FK8.Taillight", "FK8.Brakelight"],
+/**
+ * The model uses one lamp material ("FK8.Brakelight") for every light, so lights are picked by
+ * node: lamp-material meshes inside these nodes get a front (white) or rear (red) copy.
+ */
+export const LAMP_MATERIAL = "FK8.Brakelight";
+export const LIGHT_NODES = {
+  front: ["FK8HeadlightL", "FK8HeadlightR"],
+  rear: ["FK8TaillightL", "FK8TaillightR", "FK8Tailgate"],
 };
 
 export const CAMERA = {

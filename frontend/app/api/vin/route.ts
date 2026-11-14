@@ -5,7 +5,12 @@ import type { Vehicle } from "@/lib/scene-context";
 const VIN_RE = /^[A-HJ-NPR-Z0-9*]{11,17}$/;
 
 const titleCase = (s: string) =>
-  s.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase()).replace(/\bBmw\b/, "BMW");
+  s
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (c) => c.toUpperCase())
+    .replace(/\bBmw\b/, "BMW")
+    // country codes NHTSA appends in brackets, e.g. "UNITED KINGDOM (UK)"
+    .replace(/\(([A-Z][a-z])\)/g, (m) => m.toUpperCase());
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
