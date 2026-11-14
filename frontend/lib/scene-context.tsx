@@ -3,8 +3,11 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { Openable } from "./car";
 
-/** Which camera framing the scene should fly to. Pages set this; the CameraRig reacts. */
-export type View = "start" | "garage" | "engineBay" | "part";
+/**
+ * Which camera framing the scene should fly to. Pages set this; the CameraRig reacts.
+ * "explore" = the selected part is taken out of the bay to be turned around and inspected.
+ */
+export type View = "start" | "garage" | "engineBay" | "part" | "explore";
 /** How a part glows: the user's selection, or a slip result. */
 export type Glow = "select" | "diy" | "shop";
 

@@ -16,7 +16,8 @@ const STATUS: Record<PartStatus, { label: string; className: string }> = {
 export default function GaragePage() {
   const s = useScene();
   const { setView, select } = s;
-  const underHood = s.view === "engineBay" || s.view === "part";
+  const underHood = s.view === "engineBay" || s.view === "part" || s.view === "explore";
+  const exploring = s.view === "explore";
   const part = partById(s.selected);
 
   useEffect(() => {
@@ -81,8 +82,22 @@ export default function GaragePage() {
               {STATUS[part.status].label}
             </span>
             <h2 className="mt-3 text-lg font-semibold">{part.label}</h2>
-            <p className="mt-1 text-sm text-white/65">{part.about}</p>
-            <p className="mt-3 text-sm text-white/90">{part.reason}</p>
+            {exploring ? (
+              <p className="mt-1 text-sm text-white/65">Drag to turn it around. Pinch or scroll to zoom.</p>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-white/65">{part.about}</p>
+                <p className="mt-3 text-sm text-white/90">{part.reason}</p>
+              </>
+            )}
+            {part.explorable && (
+              <button
+                onClick={() => s.setView(exploring ? "part" : "explore")}
+                className="mt-4 w-full rounded-xl bg-white py-2.5 text-sm font-medium text-black transition active:scale-[0.98]"
+              >
+                {exploring ? "Put it back" : "Take it out"}
+              </button>
+            )}
           </m.section>
         )}
       </AnimatePresence>
@@ -111,7 +126,8 @@ export default function GaragePage() {
                   dot={p.status}
                   onClick={() => {
                     s.select(p.id);
-                    s.setView("part");
+                    // While exploring, a chip swaps which part is out (if that part can come out).
+                    if (!exploring || !p.explorable) s.setView("part");
                   }}
                 >
                   {p.label}

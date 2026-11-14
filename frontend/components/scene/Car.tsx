@@ -6,6 +6,7 @@ import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { easing } from "maath";
 import * as THREE from "three";
 import {
+  EXPLORE,
   HINGES,
   LAMP_MATERIAL,
   LIGHT_NODES,
@@ -16,7 +17,7 @@ import {
   partById,
   type Openable,
 } from "@/lib/car";
-import { useScene, type Glow } from "@/lib/scene-context";
+import { useScene, type Glow, type View } from "@/lib/scene-context";
 import { createXrayMaterial } from "./xray-material";
 
 const GLOW_COLORS: Record<Glow, THREE.Color> = {
@@ -26,10 +27,20 @@ const GLOW_COLORS: Record<Glow, THREE.Color> = {
 };
 
 type HingeRig = { node: THREE.Object3D; closed: THREE.Quaternion; open: THREE.Quaternion };
-type PartRig = { id: string; mats: THREE.MeshStandardMaterial[]; level: { v: number } };
+type PartRig = {
+  id: string;
+  mats: THREE.MeshStandardMaterial[];
+  level: { v: number };
+  /** group at the part's centre holding its meshes; moved and scaled to take the part out */
+  holder: THREE.Group;
+  home: THREE.Vector3;
+  /** scale that makes the part about EXPLORE.size across when taken out */
+  outScale: number;
+};
 type ShellRig = { mesh: THREE.Mesh; original: THREE.Material | THREE.Material[] };
 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0) };
+const EXPLORE_POINT = new THREE.Vector3(...EXPLORE.point);
 const noRaycast = () => {};
 
 /** Build all the lookups for a loaded model. Mutates the scene, so it must run once per scene. */
@@ -126,9 +137,11 @@ function buildRig(scene: THREE.Group) {
     if (!lamp) console.warn(`[KYC] no ${side} lamp meshes found`);
   }
 
-  // Parts: own material copies so one part can glow without lighting up the whole engine bay.
+  // Parts: own material copies so one part can glow without lighting up the whole engine bay,
+  // and a holder group at the part's centre so it can be lifted out and scaled up to explore.
   const parts: PartRig[] = PARTS.map((p) => {
     const mats: THREE.MeshStandardMaterial[] = [];
+    const meshesOfPart: THREE.Mesh[] = [];
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh || mesh.userData.partId) return;
@@ -138,12 +151,27 @@ function buildRig(scene: THREE.Group) {
       const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
       mat.emissive = new THREE.Color(0, 0, 0);
       mat.emissiveIntensity = 1;
+      // Parts were modelled to be seen from above; taken out, they're seen from every side.
+      mat.side = THREE.DoubleSide;
       mesh.material = mat;
       mesh.userData.partId = p.id;
       mats.push(mat);
+      meshesOfPart.push(mesh);
     });
     if (!mats.length) console.warn(`[KYC] part has no meshes: ${p.id}`);
-    return { id: p.id, mats, level: { v: 0 } };
+
+    const box = new THREE.Box3();
+    for (const m of meshesOfPart) box.expandByObject(m);
+    const home = box.isEmpty() ? new THREE.Vector3(...p.center) : box.getCenter(new THREE.Vector3());
+    const dims = box.isEmpty() ? new THREE.Vector3(1, 1, 1) : box.getSize(new THREE.Vector3());
+    const holder = new THREE.Group();
+    holder.name = `${p.id}Holder`;
+    holder.position.copy(home);
+    scene.add(holder);
+    holder.updateMatrixWorld(true);
+    for (const m of meshesOfPart) holder.attach(m);
+    const outScale = THREE.MathUtils.clamp(EXPLORE.size / Math.max(dims.x, dims.y, dims.z), 1, 6);
+    return { id: p.id, mats, level: { v: 0 }, holder, home, outScale };
   });
 
   // X-ray shell: exterior meshes swap to fresnel glass; the cabin stays solid.
@@ -186,7 +214,17 @@ function rigFor(scene: THREE.Group) {
 }
 
 /** What the frame loop reads from the UI state each frame. */
-type Pose = { open: Record<Openable, boolean>; lights: boolean; xray: boolean; selected: string | null; glows: Record<string, Glow> };
+type Pose = {
+  view: View;
+  open: Record<Openable, boolean>;
+  lights: boolean;
+  xray: boolean;
+  selected: string | null;
+  glows: Record<string, Glow>;
+};
+
+/** The body turns to glass while X-ray is on, and while a part is taken out to explore. */
+const isGhost = (pose: Pick<Pose, "view" | "xray">) => pose.xray || pose.view === "explore";
 
 /** Swap the shell between its own materials and the X-ray glass (once per toggle). */
 function applyXray(r: Rig, on: boolean) {
@@ -208,11 +246,18 @@ function animate(r: Rig, pose: Pose, delta: number) {
   for (const m of r.lightMats.front) m.emissiveIntensity = r.lightLevel.v * 6;
   for (const m of r.lightMats.rear) m.emissiveIntensity = r.lightLevel.v * 3;
 
-  if (pose.xray) easing.damp(r.xray.uniforms.uOpacity, "value", 1, 0.25, delta);
+  if (isGhost(pose)) easing.damp(r.xray.uniforms.uOpacity, "value", 1, 0.25, delta);
 
   const pulse = 0.75 + 0.25 * Math.sin(r.time * 3.2);
+  const outId = pose.view === "explore" && partById(pose.selected)?.explorable ? pose.selected : null;
   for (const p of r.parts) {
-    const glow: Glow | undefined = pose.selected === p.id ? "select" : pose.glows[p.id];
+    // Taken out: rise to the explore point and grow; otherwise settle back into the bay.
+    const out = p.id === outId;
+    easing.damp3(p.holder.position, out ? EXPLORE_POINT : p.home, 0.4, delta);
+    easing.damp3(p.holder.scale, out ? p.outScale : 1, 0.4, delta);
+
+    // No glow while it's out: the point is to see its real surface.
+    const glow: Glow | undefined = out ? undefined : pose.selected === p.id ? "select" : pose.glows[p.id];
     easing.damp(p.level, "v", glow ? 1 : 0, 0.2, delta);
     const color = GLOW_COLORS[glow ?? "select"];
     for (const m of p.mats) {
@@ -234,9 +279,10 @@ export function Car() {
     setModelReady(true);
   }, [scene, setModelReady]);
 
+  const ghost = isGhost(s);
   useEffect(() => {
-    if (rigRef.current) applyXray(rigRef.current, s.xray);
-  }, [s.xray, scene]);
+    if (rigRef.current) applyXray(rigRef.current, ghost);
+  }, [ghost, scene]);
 
   useFrame((_, dt) => {
     if (rigRef.current) animate(rigRef.current, s, Math.min(dt, 0.05));
@@ -248,11 +294,12 @@ export function Car() {
     if (partId) {
       e.stopPropagation();
       s.select(partId);
-      s.setView("part");
+      // While exploring, tapping another part swaps which one is out (if that part can come out).
+      if (s.view !== "explore" || !partById(partId)?.explorable) s.setView("part");
       return;
     }
     const openable = obj.userData.openable as Openable | undefined;
-    if (openable && !s.xray) {
+    if (openable && !ghost) {
       e.stopPropagation();
       s.toggle(openable);
     }
@@ -260,13 +307,14 @@ export function Car() {
 
   const onOver = (e: ThreeEvent<PointerEvent>) => {
     const d = e.object.userData;
-    if (d.partId || (d.openable && !s.xray)) document.body.style.cursor = "pointer";
+    if (d.partId || (d.openable && !ghost)) document.body.style.cursor = "pointer";
   };
   const onOut = () => {
     document.body.style.cursor = "";
   };
 
-  const selected = partById(s.selected);
+  // The label pin marks a part in the bay; once it's taken out the sheet names it instead.
+  const selected = s.view === "explore" ? null : partById(s.selected);
 
   return (
     <group>

@@ -18,6 +18,11 @@ export type Part = {
   /** where the camera sits when this part is focused */
   camera: Vec3;
   guide?: string;
+  /**
+   * Offer "Take it out" for this part. On for small do-it-yourself parts and parts whose mesh
+   * comes out clean; off where the mesh drags neighbouring hoses/brackets along with it.
+   */
+  explorable?: boolean;
 };
 
 export type Hinge = {
@@ -96,6 +101,17 @@ export const CAMERA = {
   engineBay: { position: [0.0, 2.75, 4.15] as Vec3, target: [0, 0.85, 1.75] as Vec3 },
 };
 
+/**
+ * "Take it out": the selected part lifts out of the bay to this point above the nose (clear of
+ * the open hood), scaled so its longest side is about `size` metres, and the camera orbits it.
+ * `view` is the direction the camera looks from, relative to the point.
+ */
+export const EXPLORE = {
+  point: [0, 1.65, 2.4] as Vec3,
+  size: 0.36,
+  view: [0.55, 0.45, 1] as Vec3,
+};
+
 export const PARTS: Part[] = [
   {
     id: "air_filter_box",
@@ -110,6 +126,7 @@ export const PARTS: Part[] = [
   },
   {
     id: "battery",
+    explorable: true,
     nodes: ["P_battery"],
     label: "12V battery",
     status: "diy",
@@ -121,6 +138,7 @@ export const PARTS: Part[] = [
   },
   {
     id: "washer_fluid_cap",
+    explorable: true,
     nodes: ["P_washer_fluid_cap"],
     label: "Washer fluid",
     status: "diy",
@@ -132,6 +150,7 @@ export const PARTS: Part[] = [
   },
   {
     id: "coolant_reservoir",
+    explorable: true,
     nodes: ["P_coolant_reservoir"],
     label: "Coolant reservoir",
     status: "diy",
@@ -152,6 +171,7 @@ export const PARTS: Part[] = [
   },
   {
     id: "oil_fill_cap",
+    explorable: true,
     nodes: ["P_oil_fill_cap"],
     label: "Oil fill cap",
     status: "diy",
@@ -172,6 +192,7 @@ export const PARTS: Part[] = [
   },
   {
     id: "fuse_box",
+    explorable: true,
     nodes: ["P_fuse_box"],
     label: "Fuse box",
     status: "advanced",
