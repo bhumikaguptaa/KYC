@@ -36,6 +36,7 @@ type PartRig = {
   level: { v: number };
   /** group at the part's centre holding its meshes; moved and scaled to take the part out */
   holder: THREE.Group;
+  /** the holder's resting position, in its parent's space */
   home: THREE.Vector3;
   /** scale that makes the part about EXPLORE.size across when taken out */
   outScale: number;
@@ -46,9 +47,25 @@ type Look = { xray: boolean; outId: string | null };
 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0) };
 const EXPLORE_POINT = new THREE.Vector3(...EXPLORE.point);
+const tmp = new THREE.Vector3();
 const noRaycast = () => {};
 
 type WiperRig = { pivot: THREE.Group; axis: THREE.Vector3; sweep: number };
+
+type AnyAttribute = THREE.BufferAttribute | THREE.InterleavedBufferAttribute;
+
+/** Copy just the listed vertices of an attribute (same type and normalisation) into a new one. */
+function pickVertices(attr: AnyAttribute, used: number[]) {
+  const source = "isInterleavedBufferAttribute" in attr ? attr.data.array : attr.array;
+  const Arr = source.constructor as new (n: number) => THREE.TypedArray;
+  const out = new THREE.BufferAttribute(new Arr(used.length * attr.itemSize), attr.itemSize, attr.normalized);
+  const get = [attr.getX, attr.getY, attr.getZ, attr.getW];
+  const set = [out.setX, out.setY, out.setZ, out.setW];
+  used.forEach((from, i) => {
+    for (let c = 0; c < attr.itemSize; c++) set[c].call(out, i, get[c].call(attr, from));
+  });
+  return out;
+}
 
 /**
  * Split the wiper mesh into its two arms and hang each on a pivot group. The mesh is welded by
@@ -107,9 +124,13 @@ function rigWipers(scene: THREE.Group): WiperRig[] {
   const rigs = WIPERS.arms.map((arm, k) => {
     const tris: number[] = [];
     for (let t = 0; t < index.length; t += 3) if (armOf.get(find(weld[index[t]])) === k) tris.push(index[t], index[t + 1], index[t + 2]);
+    // Each arm gets only its own vertices, so its bounds (used for sizing, centring and culling)
+    // are its own and not both arms'.
+    const used = [...new Set(tris)];
+    const remap = new Map(used.map((v, i) => [v, i]));
     const part = new THREE.BufferGeometry();
-    for (const [name, attr] of Object.entries(geo.attributes)) part.setAttribute(name, attr);
-    part.setIndex(tris);
+    for (const [name, attr] of Object.entries(geo.attributes)) part.setAttribute(name, pickVertices(attr, used));
+    part.setIndex(tris.map((v) => remap.get(v)!));
     const mesh = new THREE.Mesh(part, src.material);
     mesh.name = arm.name;
     mesh.userData.wipers = true;
@@ -261,15 +282,22 @@ function buildRig(scene: THREE.Group) {
 
     const box = new THREE.Box3();
     for (const m of meshesOfPart) box.expandByObject(m);
-    const home = box.isEmpty() ? new THREE.Vector3(...p.center) : box.getCenter(new THREE.Vector3());
+    const centre = box.isEmpty() ? new THREE.Vector3(...p.center) : box.getCenter(new THREE.Vector3());
     const dims = box.isEmpty() ? new THREE.Vector3(1, 1, 1) : box.getSize(new THREE.Vector3());
+    // The holder lives where the part's meshes live (the scene root for engine parts, the arm's
+    // pivot for a wiper), so the part still moves with anything it hangs on.
+    const parentOfPart = meshesOfPart[0]?.parent ?? scene;
+    parentOfPart.updateMatrixWorld(true);
+    const home = parentOfPart.worldToLocal(centre.clone());
     const holder = new THREE.Group();
     holder.name = `${p.id}Holder`;
     holder.position.copy(home);
-    scene.add(holder);
+    parentOfPart.add(holder);
     holder.updateMatrixWorld(true);
     for (const m of meshesOfPart) holder.attach(m);
-    const outScale = THREE.MathUtils.clamp(EXPLORE.size / Math.max(dims.x, dims.y, dims.z), 1, 6);
+    // Every part is shown at the same overall extent (bounding sphere of an EXPLORE.size cube, which
+    // is what the camera frames): small parts grow, and a long arm shrinks without ending up a sliver.
+    const outScale = THREE.MathUtils.clamp((EXPLORE.size * Math.sqrt(3)) / dims.length(), 0.25, 6);
 
     // The meshes are open shells (modelled to be seen from above). Taken out, a back-face-only copy
     // drawn in a flat colour fills every view into the inside, so the part reads as solid.
@@ -405,12 +433,14 @@ function animate(r: Rig, pose: Pose, delta: number) {
   for (const key of Object.keys(r.hinges) as Openable[])
     for (const h of r.hinges[key]) easing.dampQ(h.node.quaternion, pose.open[key] ? h.open : h.closed, 0.32, delta);
 
-  // Wipers: sweep up and back while on; when switched off, finish the stroke and park.
+  // Wipers: sweep up and back while on; when switched off, finish the stroke and park. They also
+  // park while a wiper is taken out to explore (it hangs on its arm's pivot).
+  const sweeping = pose.wipers && !partById(outPart(pose))?.nodes.some((n) => n.startsWith("FK8Wiper"));
   const phase = r.wiperPhase;
   const parked = phase.v === Math.floor(phase.v);
-  if (pose.wipers || !parked) {
+  if (sweeping || !parked) {
     const next = phase.v + delta / WIPERS.period;
-    phase.v = !pose.wipers && Math.floor(next) > Math.floor(phase.v) ? Math.floor(next) : next;
+    phase.v = !sweeping && Math.floor(next) > Math.floor(phase.v) ? Math.floor(next) : next;
   }
   const stroke = 0.5 - 0.5 * Math.cos(phase.v * Math.PI * 2); // 0 parked .. 1 top of the sweep
   for (const w of r.wipers) w.pivot.quaternion.setFromAxisAngle(w.axis, w.sweep * stroke);
@@ -427,7 +457,8 @@ function animate(r: Rig, pose: Pose, delta: number) {
   for (const p of r.parts) {
     // Taken out: rise to the explore point and grow; otherwise settle back into the bay.
     const out = p.id === outId;
-    easing.damp3(p.holder.position, out ? EXPLORE_POINT : p.home, 0.4, delta);
+    const target = out ? p.holder.parent!.worldToLocal(tmp.copy(EXPLORE_POINT)) : p.home;
+    easing.damp3(p.holder.position, target, 0.4, delta);
     easing.damp3(p.holder.scale, out ? p.outScale : 1, 0.4, delta);
 
     // No glow while it's out: the point is to see its real surface.
@@ -467,7 +498,9 @@ export function Car() {
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     const obj = e.object;
     const partId = obj.userData.partId as string | undefined;
-    if (partId) {
+    const underHood = s.view === "engineBay" || s.view === "part" || s.view === "explore";
+    // Around the car, tapping a wiper runs the wipers; under the hood it's a part like the others.
+    if (partId && (underHood || !obj.userData.wipers)) {
       e.stopPropagation();
       s.select(partId);
       // While exploring, tapping another part swaps which one is out (if that part can come out).

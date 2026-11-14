@@ -196,6 +196,24 @@ export const PARTS: Part[] = [
     guide: "washer-fluid",
   },
   {
+    // The wiper whose pivot is on the +X side (the short arm, split out of the wiper mesh at load).
+    id: "wiper",
+    nodes: ["FK8WiperShort"],
+    explorable: true,
+    facts: [
+      { label: "Replace", value: "Every 6–12 months, or as soon as they streak, chatter or skip." },
+      { label: "Swapping a blade", value: "Lift the arm off the glass, press the tab where the blade meets the arm, slide the blade off the hook." },
+      { label: "Careful", value: "Hold the bare arm. If it snaps back onto the glass it can crack the windshield." },
+      { label: "Buying", value: "The two blades are different lengths. Use the fit guide in the store or your owner's manual." },
+    ],
+    label: "Wiper blade",
+    status: "diy",
+    reason: "No tools. Lift the arm, press the tab, slide the old blade off.",
+    about: "Clears rain from the windshield. The rubber edge wears out with sun and use.",
+    center: [0.19, 1.17, 1.36],
+    camera: [0.5, 1.95, 2.45],
+  },
+  {
     id: "coolant_reservoir",
     explorable: true,
     facts: [
