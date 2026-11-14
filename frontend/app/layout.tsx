@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { SceneMount } from "@/components/scene/SceneMount";
 import { SerwistProvider } from "@serwist/next/react";
 import { LoadingVeil } from "@/components/ui/LoadingVeil";
@@ -9,6 +9,8 @@ import { SceneProvider } from "@/lib/scene-context";
 import "./globals.css";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"], weight: ["400", "500", "600"] });
+// Mono for anything read like an instrument: the VIN, the model year, gauge labels.
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], weight: ["400", "500"] });
 
 // iOS launch images: shown while the installed app starts, instead of a blank screen.
 // [CSS width, CSS height, pixel ratio] for each iPhone screen size; files are in public/splash.
@@ -48,8 +50,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geist.variable} h-full antialiased`}>
-      <body className="h-full overflow-hidden bg-[#0a0a0b] text-white select-none">
+    <html lang="en" className={`${geist.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="h-full overflow-hidden bg-ink text-chalk select-none">
         {/* Registers the service worker (offline support). Off in dev so stale caches never confuse us. */}
         <SerwistProvider
           swUrl="/sw.js"

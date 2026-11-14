@@ -1,19 +1,41 @@
 @import "tailwindcss";
 
+/*
+ * KYC's palette is the dashboard's. Every colour means what it means on the instrument cluster
+ * (ISO 2575 tell-tales), so drivers of any age already know how to read it:
+ *   go      green   a system is on and fine     -> "you can do this yourself"
+ *   caution amber   check soon, take care       -> "advanced: be careful"
+ *   stop    red     stop, get help              -> "leave this to a mechanic"
+ *   beam    blue    high beam, "this is on"     -> selection and active controls
+ * Everything else is the night-time cabin: near-black graphite and a warm, chalky white.
+ * Colour is never decoration here; if something is coloured, it is telling you something.
+ */
 @theme inline {
   --font-sans: var(--font-geist-sans);
-  --color-accent: #5bd1ff;
-  --color-diy: #34d399;
-  --color-shop: #f87171;
-  --color-advanced: #fbbf24;
+  --font-mono: var(--font-geist-mono);
+
+  --color-ink: #0a0a0b;
+  --color-chalk: #f3f1ec;
+  --color-beam: #6b97ff;
+  --color-go: #3dd68c;
+  --color-caution: #ffb224;
+  --color-stop: #ff5a4e;
+
+  /* Status names used by the car data, mapped onto the tell-tales. */
+  --color-diy: var(--color-go);
+  --color-advanced: var(--color-caution);
+  --color-shop: var(--color-stop);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html,
 body {
   height: 100%;
   background: #0a0a0b;
-  color: #f5f5f7;
+  color: #f3f1ec;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
@@ -27,25 +49,108 @@ input {
   user-select: text;
 }
 
+/* Keyboard users get a clear ring; mouse and touch don't. */
+:focus-visible {
+  outline: 2px solid var(--color-beam);
+  outline-offset: 3px;
+}
+
 /* Keep panels clear of the notch and home bar when installed to the home screen. */
 .safe-area {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
 }
 
-/* Frosted panel used by every sheet and card. In the components layer so utilities can override it. */
 @layer components {
+  /*
+   * The one surface. Solid enough to read on top of a bright red car (Tesla's screens are
+   * matte, not see-through), with a hairline top highlight like a lit bezel.
+   */
   .glass {
-    background: rgb(20 20 23 / 0.62);
-    border: 1px solid rgb(255 255 255 / 0.09);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    background: rgb(19 20 23 / 0.74);
+    border: 1px solid rgb(255 255 255 / 0.075);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 18px 40px -18px rgb(0 0 0 / 0.7);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
   }
+
+  /* Small instrument label: mono, uppercase, spaced like the print on a gauge face. */
+  .gauge-label {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(243 241 236 / 0.5);
+  }
+}
+
+/* A lit tell-tale: the lamp colour plus the soft bloom a real bulb has behind the lens. */
+@utility lamp {
+  border-radius: 9999px;
+  background: currentColor;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.35),
+    0 0 10px 1px color-mix(in oklab, currentColor 55%, transparent);
 }
 
 @utility no-scrollbar {
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Fade a horizontally scrolling row out at its edges so it reads as "there's more". */
+@utility fade-x {
+  mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 28px), transparent 100%);
+}
+
+@keyframes caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+@utility caret-blink {
+  animation: caret 1.05s steps(1) infinite;
+}
+
+@keyframes ping-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@utility ping-ring {
+  animation: ping-ring 2.2s var(--ease-out-quint) infinite;
+}
+
+/* Labels on the car pop in from their anchor point. */
+@keyframes spot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateY(4px);
+  }
+}
+@utility spot-in {
+  animation: spot-in 420ms var(--ease-out-quint) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spot-in,
+  .ping-ring,
+  .caret-blink {
+    animation: none;
   }
 }

@@ -26,11 +26,24 @@ app/
   api/vin/route.ts      NHTSA vPIC decode (wildcards allowed for the demo pattern)
   api/recalls/route.ts  NHTSA recalls by make/model/year
   manifest.ts           Add-to-home-screen
-components/scene/       Scene (Canvas), Car (model rig), CameraRig, Studio, xray-material
-components/ui/          MotionProvider (LazyMotion + shared spring), LoadingVeil
+components/scene/       Scene (Canvas), Car (model rig), CameraRig, Studio, xray-material,
+                        Hotspots (labels on the car: "Open hood", part lights in the bay)
+components/ui/          MotionProvider (LazyMotion domMax + shared springs), LoadingVeil (bulb check),
+                        VinPlate (17-character VIN readout), status (tell-tale colours), icons
+lib/palette.ts          The tell-tale colours for three.js (mirrors the @theme block in globals.css)
+lib/hotspots.ts         Where the on-car labels sit
+lib/ui.ts               tick() haptics, useWide(), one-off hint memory
 lib/car.ts              Everything about the Civic: hinges, parts, camera poses
 lib/scene-context.tsx   Shared state: view, open panels, lights, x-ray, selection, glows, vehicle
 ```
+
+## Design language
+
+Every colour is a dashboard tell-tale and means what it means in a car: **green** you can do it
+yourself, **amber** take care, **red** mechanic, **high-beam blue** selected / switched on. The rest
+is the night-time cabin: graphite and warm white. If something is coloured, it is telling you
+something. Controls always have a word next to the icon, and what you can operate is labelled on
+the car itself.
 
 ## How the 3D works
 

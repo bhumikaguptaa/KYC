@@ -1,11 +1,12 @@
 import * as THREE from "three";
+import { TELLTALE } from "@/lib/palette";
 
 /**
  * Fresnel "glass shell" for X-ray mode: nearly invisible where the surface faces the camera,
  * bright at grazing angles, so the body reads as an outline and the parts inside stay visible.
  * Additive and depth-write off, so it never hides what is behind it.
  */
-export function createXrayMaterial(color = "#5bd1ff") {
+export function createXrayMaterial(color: string = TELLTALE.beam) {
   return new THREE.ShaderMaterial({
     name: "KYC.Xray",
     uniforms: {

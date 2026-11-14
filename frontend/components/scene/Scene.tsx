@@ -6,6 +6,7 @@ import { AgXToneMapping } from "three";
 import { CAMERA } from "@/lib/car";
 import { Car } from "./Car";
 import { CameraRig } from "./CameraRig";
+import { Hotspots } from "./Hotspots";
 import { Studio } from "./Studio";
 
 /** Phones have 3x screens. Past 1.5x the extra pixels cost a lot of GPU and no one can see them. */
@@ -48,6 +49,7 @@ export default function Scene() {
         <Suspense fallback={null}>
           <Car />
         </Suspense>
+        <Hotspots />
       </Fragment>
       <CameraRig />
     </Canvas>

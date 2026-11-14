@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ContactShadows, Html, useGLTF } from "@react-three/drei";
+import { ContactShadows, useGLTF } from "@react-three/drei";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { easing } from "maath";
 import * as THREE from "three";
@@ -18,13 +18,14 @@ import {
   partById,
   type Openable,
 } from "@/lib/car";
+import { TELLTALE } from "@/lib/palette";
 import { useScene, type Glow, type View } from "@/lib/scene-context";
 import { createXrayMaterial } from "./xray-material";
 
 const GLOW_COLORS: Record<Glow, THREE.Color> = {
-  select: new THREE.Color("#5bd1ff"),
-  diy: new THREE.Color("#34d399"),
-  shop: new THREE.Color("#f87171"),
+  select: new THREE.Color(TELLTALE.beam),
+  diy: new THREE.Color(TELLTALE.go),
+  shop: new THREE.Color(TELLTALE.stop),
 };
 
 type HingeRig = { node: THREE.Object3D; closed: THREE.Quaternion; open: THREE.Quaternion };
@@ -529,21 +530,12 @@ export function Car() {
     document.body.style.cursor = "";
   };
 
-  // The label pin marks a part in the bay; once it's taken out the sheet names it instead.
-  const selected = s.view === "explore" ? null : partById(s.selected);
-
   return (
     <group>
       <primitive object={scene} onClick={onClick} onPointerOver={onOver} onPointerOut={onOut} />
       {/* Baked once, after the car exists (it lives inside the car's Suspense boundary). */}
       <ContactShadows position={[0, 0.001, 0]} scale={12} opacity={0.75} blur={2.4} far={2.5} resolution={512} frames={1} />
-      {selected && (
-        <Html position={[selected.center[0], selected.center[1] + 0.16, selected.center[2]]} center zIndexRange={[20, 0]}>
-          <div className="pointer-events-none whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
-            {selected.label}
-          </div>
-        </Html>
-      )}
+      {/* Part labels and pins are drawn by <Hotspots/>. */}
     </group>
   );
 }
