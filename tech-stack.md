@@ -19,6 +19,6 @@ Next.js (App Router) on Vercel, React Three Fiber for 3D, and no extra state lib
 | VIN entry | A VIN entry field plus a demo-VIN button that fills it in automatically. No VIN scanning in the demo | Fastest path through the demo; no camera or barcode library needed |
 | VIN data | NHTSA vPIC DecodeVinValuesExtended (docs) | Free, no key, real data |
 | Recalls | NHTSA api.nhtsa.gov/recalls/recallsByVehicle?make=&model=&modelYear= (example) | Free, keyless, real campaigns |
-| Slip reading | Claude vision via @anthropic-ai/sdk in an API route, tool-use JSON output restricted to our part IDs | Reads messy slips; cannot invent parts outside our list. Server-only, no client bundle cost |
+| Slip reading | Claude (`claude-opus-5-5`) reads the quote PDF via @anthropic-ai/sdk in an API route (`POST /api/quote`). Structured output: a JSON schema, written with `zod`, that the API enforces and that restricts parts to our part IDs | Reads messy slips; cannot invent parts outside our list. Server-only, no client bundle cost. Structured output replaces forced tool use, which this model rejects |
 | Model pipeline | @gltf-transform/cli optimize (meshopt + WebP textures) with `--join false --flatten false` | About 20 MB down to a few MB, loads fast on phones. The flags keep each clickable part as its own named mesh instead of merging them |
 | Bundle analysis | @next/bundle-analyzer (dev dependency) | Shows what actually ships to the phone so bloat is caught early |
