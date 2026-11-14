@@ -473,7 +473,9 @@ function animate(r: Rig, pose: Pose, delta: number) {
 }
 
 export function Car() {
-  const { scene } = useGLTF(MODEL_URL);
+  // No Draco (second argument): the model is meshopt-compressed, and the meshopt decoder ships in
+  // our own bundle, so loading needs no third-party download and works offline.
+  const { scene } = useGLTF(MODEL_URL, false);
   const s = useScene();
   const { setModelReady } = s;
   // three.js objects are mutated imperatively (above), so the rig lives behind a ref, not in render state.
@@ -546,4 +548,4 @@ export function Car() {
   );
 }
 
-useGLTF.preload(MODEL_URL);
+useGLTF.preload(MODEL_URL, false);

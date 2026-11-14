@@ -11,7 +11,7 @@ export function Studio() {
   return (
     <>
       <color attach="background" args={["#0a0a0b"]} />
-      <fog attach="fog" args={["#0a0a0b", 14, 30]} />
+      <fog attach="fog" args={["#0a0a0b", 24, 44]} />
 
       <Environment resolution={256} frames={1} background={false}>
         <Lightformer form="rect" intensity={2.4} position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[12, 3, 1]} />
@@ -24,7 +24,7 @@ export function Studio() {
       <ambientLight intensity={0.15} />
 
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.002, 0]}>
-        <circleGeometry args={[30, 64]} />
+        <circleGeometry args={[40, 64]} />
         <meshStandardMaterial color="#0e0e10" roughness={0.9} metalness={0} />
       </mesh>
     </>

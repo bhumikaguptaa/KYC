@@ -43,7 +43,8 @@ export type Hinge = {
   carries?: string[];
 };
 
-export const MODEL_URL = "/models/civic.glb";
+/** Versioned by filename: a new model gets a new name (v2, v3), so caches never serve a stale one. */
+export const MODEL_URL = "/models/civic.v1.glb";
 
 export const HINGES = {
   hood: [{ node: "FK8Hood", axis: "x", angle: -60, pivot: [0, 1.212, 1.161] }],
