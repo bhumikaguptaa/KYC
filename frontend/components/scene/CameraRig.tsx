@@ -15,13 +15,14 @@ function explorePose(fovDeg: number, aspect: number): { position: Vec3; target: 
   const half = (fovDeg * Math.PI) / 360;
   const fitHalf = Math.min(half, Math.atan(Math.tan(half) * aspect));
   const radius = (EXPLORE.size * Math.sqrt(3)) / 2; // bounding sphere of an EXPLORE.size cube
-  const distance = (radius * 1.15) / Math.sin(fitHalf);
+  // Phones get a little more margin: the part shares the screen with the sheet below it.
+  const distance = (radius * (aspect < 1 ? 1.3 : 1.15)) / Math.sin(fitHalf);
   const [dx, dy, dz] = EXPLORE.view;
   const len = Math.hypot(dx, dy, dz);
   const [px, pz] = [EXPLORE.point[0], EXPLORE.point[2]];
-  // On a tall phone screen the part sheet covers the bottom, so aim a little below the part
-  // to sit it in the upper half of the screen.
-  const py = EXPLORE.point[1] - (aspect < 1 ? radius * 0.55 : 0);
+  // On a tall phone screen the part sheet covers the bottom, so aim below the part to sit it in
+  // the upper half of the screen (0.1 x distance is roughly a sixth of the screen height).
+  const py = EXPLORE.point[1] - (aspect < 1 ? distance * 0.1 : 0);
   return {
     position: [px + (dx / len) * distance, py + (dy / len) * distance, pz + (dz / len) * distance],
     target: [px, py, pz],
@@ -31,7 +32,7 @@ function explorePose(fovDeg: number, aspect: number): { position: Vec3; target: 
 /** One camera for the whole app. Views are poses; every change is an eased fly-to, never a cut. */
 export function CameraRig() {
   const ref = useRef<CameraControls>(null);
-  const { view, selected } = useScene();
+  const { view, selected, recenterKey } = useScene();
   const camera = useThree((st) => st.camera) as PerspectiveCamera;
   const aspect = useThree((st) => st.size.width / Math.max(1, st.size.height));
   // The explore turntable stops for good once the user grabs the camera.
@@ -54,7 +55,7 @@ export function CameraRig() {
     if (view === "explore") ({ position: pos, target } = explorePose(camera.fov, aspect));
     idleRef.current = true;
     void c.setLookAt(...pos, ...target, true);
-  }, [view, selected, camera, aspect]);
+  }, [view, selected, camera, aspect, recenterKey]);
 
   useEffect(() => {
     const c = ref.current;
@@ -79,15 +80,18 @@ export function CameraRig() {
     <CameraControls
       ref={ref}
       makeDefault
-      smoothTime={0.55}
-      draggingSmoothTime={0.12}
-      // Exploring a part: get close, and look at it from below as well as above.
-      minDistance={exploring ? 0.3 : 0.9}
-      maxDistance={exploring ? 4 : 11}
+      // Exploring a part is hands-on: snappier response, zoom toward the cursor / pinch point,
+      // two-finger (or right-drag) pan, get close, and look at it from below as well as above.
+      smoothTime={exploring ? 0.3 : 0.55}
+      draggingSmoothTime={exploring ? 0.08 : 0.12}
+      dollyToCursor={exploring}
+      dollySpeed={exploring ? 0.7 : 0.6}
+      truckSpeed={exploring ? 1.2 : 0}
+      // The part is about EXPLORE.size across, so 0.5 stops just short of its surface.
+      minDistance={exploring ? 0.5 : 0.9}
+      maxDistance={exploring ? 3.5 : 11}
       minPolarAngle={exploring ? 0.05 : 0.15}
       maxPolarAngle={exploring ? Math.PI * 0.8 : Math.PI * 0.47}
-      dollySpeed={0.6}
-      truckSpeed={0}
     />
   );
 }

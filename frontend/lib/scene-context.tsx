@@ -49,6 +49,12 @@ type SceneState = {
   setModelReady: (v: boolean) => void;
   vehicle: Vehicle | null;
   setVehicle: (v: Vehicle | null) => void;
+  /** a taken-out part is drawn solid (inside filled) or hollow (the open mesh as modelled) */
+  solid: boolean;
+  setSolid: (v: boolean) => void;
+  /** bumped to fly the camera back to the current view's framing */
+  recenterKey: number;
+  recenter: () => void;
   recalls: Recall[];
   /** what NHTSA filed the recalls under, and whether that is this exact model or its family */
   recallScope: { filedUnder: string; exact: boolean } | null;
@@ -71,6 +77,9 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const [glows, setGlows] = useState<Record<string, Glow>>({});
   const [modelReady, setModelReady] = useState(false);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [solid, setSolid] = useState(true);
+  const [recenterKey, setRecenterKey] = useState(0);
+  const recenter = useCallback(() => setRecenterKey((k) => k + 1), []);
   const [recalls, setRecallList] = useState<Recall[]>([]);
   const [recallScope, setRecallScope] = useState<SceneState["recallScope"]>(null);
 
@@ -102,11 +111,15 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       setModelReady,
       vehicle,
       setVehicle,
+      solid,
+      setSolid,
+      recenterKey,
+      recenter,
       recalls,
       recallScope,
       setRecalls,
     }),
-    [view, open, toggle, lights, xray, selected, glows, modelReady, vehicle, recalls, recallScope, setRecalls],
+    [view, open, toggle, lights, xray, selected, glows, modelReady, vehicle, solid, recenterKey, recenter, recalls, recallScope, setRecalls],
   );
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;

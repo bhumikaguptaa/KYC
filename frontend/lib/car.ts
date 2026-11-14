@@ -23,7 +23,11 @@ export type Part = {
    * comes out clean; off where the mesh drags neighbouring hoses/brackets along with it.
    */
   explorable?: boolean;
+  /** short, practical facts shown while the part is taken out */
+  facts?: Fact[];
 };
+
+export type Fact = { label: string; value: string };
 
 export type Hinge = {
   node: string;
@@ -107,9 +111,10 @@ export const CAMERA = {
  * `view` is the direction the camera looks from, relative to the point.
  */
 export const EXPLORE = {
-  point: [0, 1.65, 2.4] as Vec3,
+  // ~0.7 m ahead of the nose and well above it, so the open hood and body stay out of the way.
+  point: [0, 1.85, 3.1] as Vec3,
   size: 0.36,
-  view: [0.55, 0.45, 1] as Vec3,
+  view: [0.55, 0.4, 1] as Vec3,
 };
 
 export const PARTS: Part[] = [
@@ -127,6 +132,12 @@ export const PARTS: Part[] = [
   {
     id: "battery",
     explorable: true,
+    facts: [
+      { label: "Lasts", value: "About 3–5 years. Heat wears it out faster than cold." },
+      { label: "Signs it's going", value: "Slow, labouring starts, dim lights at start-up, or the battery light on the dash." },
+      { label: "Tools", value: "A 10 mm wrench for the terminals and the hold-down." },
+      { label: "Buying one", value: "Match the group size and cold-cranking amps (CCA) on the old battery's label." },
+    ],
     nodes: ["P_battery"],
     label: "12V battery",
     status: "diy",
@@ -139,6 +150,11 @@ export const PARTS: Part[] = [
   {
     id: "washer_fluid_cap",
     explorable: true,
+    facts: [
+      { label: "Fill with", value: "Washer fluid, not plain water. Water freezes and leaves deposits in the jets." },
+      { label: "In winter", value: "Use a fluid rated below freezing (sold as de-icer or winter blend)." },
+      { label: "When", value: "Whenever the low-washer warning shows. Engine on or off, it doesn't matter." },
+    ],
     nodes: ["P_washer_fluid_cap"],
     label: "Washer fluid",
     status: "diy",
@@ -151,6 +167,12 @@ export const PARTS: Part[] = [
   {
     id: "coolant_reservoir",
     explorable: true,
+    facts: [
+      { label: "Coolant", value: "Honda Type 2 coolant (blue, comes pre-mixed). Don't mix in other colours." },
+      { label: "Check", value: "Engine cold. The level should sit between MIN and MAX on the side of the tank." },
+      { label: "Careful", value: "Never open it hot: the coolant is under pressure and can scald." },
+      { label: "Keeps dropping?", value: "Steady loss means a leak somewhere. Have a mechanic look." },
+    ],
     nodes: ["P_coolant_reservoir"],
     label: "Coolant reservoir",
     status: "diy",
@@ -172,6 +194,12 @@ export const PARTS: Part[] = [
   {
     id: "oil_fill_cap",
     explorable: true,
+    facts: [
+      { label: "Oil grade", value: "0W-20, printed on the cap." },
+      { label: "Check the level", value: "With the dipstick, engine warm and off, car on level ground." },
+      { label: "Oil changes", value: "When the Maintenance Minder on the dash asks for one." },
+      { label: "Put it back", value: "Twist it on snug by hand. A loose cap can leak oil and smell of burning." },
+    ],
     nodes: ["P_oil_fill_cap"],
     label: "Oil fill cap",
     status: "diy",
@@ -193,6 +221,13 @@ export const PARTS: Part[] = [
   {
     id: "fuse_box",
     explorable: true,
+    facts: [
+      { label: "What's inside", value: "Fuses and relays for the engine, lights, fans and more." },
+      { label: "Find the fuse", value: "The lid has a diagram naming each slot." },
+      { label: "Replacing", value: "Same amp rating (the number on top). Never fit a bigger one." },
+      { label: "Blows again?", value: "Something is shorting. That's a job for a mechanic." },
+      { label: "Also", value: "There's a second fuse box inside the car, under the dashboard." },
+    ],
     nodes: ["P_fuse_box"],
     label: "Fuse box",
     status: "advanced",

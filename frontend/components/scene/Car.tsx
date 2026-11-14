@@ -30,6 +30,8 @@ type HingeRig = { node: THREE.Object3D; closed: THREE.Quaternion; open: THREE.Qu
 type PartRig = {
   id: string;
   mats: THREE.MeshStandardMaterial[];
+  /** back-face fills shown in "solid" mode, so the open mesh reads as a solid object */
+  caps: THREE.Mesh[];
   level: { v: number };
   /** group at the part's centre holding its meshes; moved and scaled to take the part out */
   holder: THREE.Group;
@@ -38,6 +40,8 @@ type PartRig = {
   outScale: number;
 };
 type ShellRig = { mesh: THREE.Mesh; original: THREE.Material | THREE.Material[] };
+/** How the car is drawn: its own materials, X-ray shell, or (exploring) everything but one part ghosted. */
+type Look = { xray: boolean; outId: string | null; solid: boolean };
 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0) };
 const EXPLORE_POINT = new THREE.Vector3(...EXPLORE.point);
@@ -100,11 +104,17 @@ function buildRig(scene: THREE.Group) {
     for (const m of meshes) if ((m.material as THREE.Material).name === "FK8.Paint") m.material = paint;
   }
 
-  // The Blender export lost two materials' settings: tyres came out plain white, and the lamp
-  // lenses came out opaque white, hiding the lamps behind them. Restore both.
+  // Fix materials the Blender export got wrong: tyres came out plain white, the lamp lenses
+  // opaque white (hiding the lamps), and the engine-bay material as alpha *blend*, which three.js
+  // draws without depth writes, so inner faces showed through outer ones. Its texture's alpha is
+  // a plain cutout (fully opaque or fully clear), so draw it opaque with an alpha cutoff instead.
   for (const m of meshes) {
     const mat = m.material as THREE.MeshStandardMaterial;
-    if (mat.name === "FK8.Tire") {
+    if (mat.name === "FK8.Engine") {
+      mat.transparent = false;
+      mat.depthWrite = true;
+      mat.alphaTest = 0.5;
+    } else if (mat.name === "FK8.Tire") {
       mat.color.set("#151517");
       mat.roughness = 0.9;
     } else if (mat.name === "FK8.HeadlightGlass") {
@@ -139,6 +149,7 @@ function buildRig(scene: THREE.Group) {
 
   // Parts: own material copies so one part can glow without lighting up the whole engine bay,
   // and a holder group at the part's centre so it can be lifted out and scaled up to explore.
+  const capMat = new THREE.MeshBasicMaterial({ name: "KYC.PartCap", color: "#2a2a2f", side: THREE.BackSide });
   const parts: PartRig[] = PARTS.map((p) => {
     const mats: THREE.MeshStandardMaterial[] = [];
     const meshesOfPart: THREE.Mesh[] = [];
@@ -171,7 +182,19 @@ function buildRig(scene: THREE.Group) {
     holder.updateMatrixWorld(true);
     for (const m of meshesOfPart) holder.attach(m);
     const outScale = THREE.MathUtils.clamp(EXPLORE.size / Math.max(dims.x, dims.y, dims.z), 1, 6);
-    return { id: p.id, mats, level: { v: 0 }, holder, home, outScale };
+
+    // The meshes are open shells (modelled to be seen from above). A back-face-only copy drawn in a
+    // flat colour fills every view into the inside, so "solid" mode reads as a solid object.
+    const caps = meshesOfPart.map((m) => {
+      const cap = new THREE.Mesh(m.geometry, capMat);
+      cap.name = `${m.name}Cap`;
+      cap.userData.cap = true;
+      cap.visible = false;
+      cap.raycast = noRaycast;
+      m.add(cap);
+      return cap;
+    });
+    return { id: p.id, mats, caps, level: { v: 0 }, holder, home, outScale };
   });
 
   // X-ray shell: exterior meshes swap to fresnel glass; the cabin stays solid.
@@ -196,7 +219,26 @@ function buildRig(scene: THREE.Group) {
     });
   }
 
-  return { hinges, parts, shell, lightMats, xray: createXrayMaterial(), lightLevel: { v: 0 }, time: 0 };
+  // Everything drawn, with its own material, so exploring can ghost the whole car but one part.
+  const all: ShellRig[] = [];
+  scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (mesh.isMesh && !mesh.userData.cap) all.push({ mesh, original: mesh.material });
+  });
+
+  return {
+    hinges,
+    parts,
+    shell,
+    all,
+    lightMats,
+    xray: createXrayMaterial(),
+    // Dimmer glass for the rest of the car while a part is out, so it never gets in the way.
+    ghost: createXrayMaterial(),
+    lightLevel: { v: 0 },
+    time: 0,
+    look: { xray: false, outId: null, solid: true } as Look,
+  };
 }
 
 type Rig = ReturnType<typeof buildRig>;
@@ -221,18 +263,48 @@ type Pose = {
   xray: boolean;
   selected: string | null;
   glows: Record<string, Glow>;
+  solid: boolean;
 };
 
-/** The body turns to glass while X-ray is on, and while a part is taken out to explore. */
-const isGhost = (pose: Pick<Pose, "view" | "xray">) => pose.xray || pose.view === "explore";
+/** The part that is taken out, if any (only parts flagged explorable come out). */
+const outPart = (pose: Pick<Pose, "view" | "selected">) =>
+  pose.view === "explore" && partById(pose.selected)?.explorable ? pose.selected : null;
 
-/** Swap the shell between its own materials and the X-ray glass (once per toggle). */
-function applyXray(r: Rig, on: boolean) {
-  for (const { mesh, original } of r.shell) {
-    mesh.material = on ? r.xray : original;
-    mesh.raycast = on ? noRaycast : THREE.Mesh.prototype.raycast;
+/** Put every mesh in the right material for the look (runs once per change, not per frame). */
+function applyLook(r: Rig, look: Look) {
+  const prev = r.look;
+  for (const { mesh, original } of r.all) {
+    mesh.material = original;
+    mesh.raycast = THREE.Mesh.prototype.raycast;
   }
-  if (on) r.xray.uniforms.uOpacity.value = 0;
+  if (look.outId) {
+    // Exploring: the whole car but the taken-out part turns to faint glass. Parts left in the bay
+    // stay tappable (to swap which one is out); the rest of the car ignores taps.
+    for (const { mesh } of r.all) {
+      if (mesh.userData.partId === look.outId) continue;
+      mesh.material = r.ghost;
+      if (!mesh.userData.partId) mesh.raycast = noRaycast;
+    }
+    if (!prev.outId) r.ghost.uniforms.uOpacity.value = 0;
+  } else if (look.xray) {
+    for (const { mesh } of r.shell) {
+      mesh.material = r.xray;
+      mesh.raycast = noRaycast;
+    }
+    if (!prev.xray || prev.outId) r.xray.uniforms.uOpacity.value = 0;
+  }
+  for (const p of r.parts) {
+    const solid = p.id === look.outId && look.solid;
+    for (const c of p.caps) c.visible = solid;
+    for (const m of p.mats) {
+      const side = solid ? THREE.FrontSide : THREE.DoubleSide;
+      if (m.side !== side) {
+        m.side = side;
+        m.needsUpdate = true;
+      }
+    }
+  }
+  r.look = look;
 }
 
 /** Ease every animated value toward the current pose. Runs once per frame. */
@@ -246,10 +318,11 @@ function animate(r: Rig, pose: Pose, delta: number) {
   for (const m of r.lightMats.front) m.emissiveIntensity = r.lightLevel.v * 6;
   for (const m of r.lightMats.rear) m.emissiveIntensity = r.lightLevel.v * 3;
 
-  if (isGhost(pose)) easing.damp(r.xray.uniforms.uOpacity, "value", 1, 0.25, delta);
+  if (r.look.outId) easing.damp(r.ghost.uniforms.uOpacity, "value", 0.4, 0.25, delta);
+  else if (r.look.xray) easing.damp(r.xray.uniforms.uOpacity, "value", 1, 0.25, delta);
 
   const pulse = 0.75 + 0.25 * Math.sin(r.time * 3.2);
-  const outId = pose.view === "explore" && partById(pose.selected)?.explorable ? pose.selected : null;
+  const outId = outPart(pose);
   for (const p of r.parts) {
     // Taken out: rise to the explore point and grow; otherwise settle back into the bay.
     const out = p.id === outId;
@@ -279,10 +352,12 @@ export function Car() {
     setModelReady(true);
   }, [scene, setModelReady]);
 
-  const ghost = isGhost(s);
+  const outId = outPart(s);
+  // Tapping panels open is off while the body is glass (X-ray or exploring).
+  const ghost = s.xray || outId !== null;
   useEffect(() => {
-    if (rigRef.current) applyXray(rigRef.current, ghost);
-  }, [ghost, scene]);
+    if (rigRef.current) applyLook(rigRef.current, { xray: s.xray, outId, solid: s.solid });
+  }, [s.xray, outId, s.solid, scene]);
 
   useFrame((_, dt) => {
     if (rigRef.current) animate(rigRef.current, s, Math.min(dt, 0.05));

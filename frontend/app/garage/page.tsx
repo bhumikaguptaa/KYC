@@ -78,12 +78,52 @@ export default function GaragePage() {
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={spring}
           >
-            <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${STATUS[part.status].className}`}>
-              {STATUS[part.status].label}
-            </span>
-            <h2 className="mt-3 text-lg font-semibold">{part.label}</h2>
+            {/* Exploring on a phone: badge beside the title, to keep the sheet short. */}
+            <div className={exploring ? "flex flex-row-reverse items-center justify-end gap-3 sm:block" : ""}>
+              <span
+                className={`inline-block shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATUS[part.status].className}`}
+              >
+                {STATUS[part.status].label}
+              </span>
+              <h2 className={`text-lg font-semibold ${exploring ? "sm:mt-3" : "mt-3"}`}>{part.label}</h2>
+            </div>
             {exploring ? (
-              <p className="mt-1 text-sm text-white/65">Drag to turn it around. Pinch or scroll to zoom.</p>
+              <>
+                {part.facts && (
+                  // Phones: a row of cards you swipe sideways, so the sheet stays short and the part
+                  // stays visible. Desktop: a plain list.
+                  <dl className="no-scrollbar -mx-5 mt-3 flex snap-x snap-mandatory gap-2 overflow-x-auto px-5 text-sm sm:mx-0 sm:block sm:space-y-2.5 sm:overflow-visible sm:px-0">
+                    {part.facts.map((f) => (
+                      <div key={f.label} className="w-60 shrink-0 snap-start rounded-xl bg-white/5 p-3 sm:w-auto sm:bg-transparent sm:p-0">
+                        <dt className="text-xs text-white/45">{f.label}</dt>
+                        <dd className="mt-0.5 text-white/90">{f.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="flex flex-1 rounded-xl bg-white/5 p-1 text-sm" role="group" aria-label="Show the part">
+                    {([true, false] as const).map((solid) => (
+                      <button
+                        key={String(solid)}
+                        onClick={() => s.setSolid(solid)}
+                        aria-pressed={s.solid === solid}
+                        className={`flex-1 rounded-lg py-1.5 transition ${
+                          s.solid === solid ? "bg-white/15 text-white" : "text-white/55"
+                        }`}
+                      >
+                        {solid ? "Solid" : "Hollow"}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={s.recenter}
+                    className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white/75 transition active:scale-95"
+                  >
+                    Recenter
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <p className="mt-1 text-sm text-white/65">{part.about}</p>
@@ -93,10 +133,15 @@ export default function GaragePage() {
             {part.explorable && (
               <button
                 onClick={() => s.setView(exploring ? "part" : "explore")}
-                className="mt-4 w-full rounded-xl bg-white py-2.5 text-sm font-medium text-black transition active:scale-[0.98]"
+                className="mt-3 w-full rounded-xl bg-white py-2.5 text-sm font-medium text-black transition active:scale-[0.98]"
               >
                 {exploring ? "Put it back" : "Take it out"}
               </button>
+            )}
+            {exploring && (
+              <p className="mt-2.5 hidden text-center text-xs text-white/40 sm:block">
+                Drag to turn · pinch or scroll to zoom · two fingers or right-drag to move
+              </p>
             )}
           </m.section>
         )}
