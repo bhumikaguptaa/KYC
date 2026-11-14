@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "analyze": "ANALYZE=true next build --webpack"
+    "analyze": "ANALYZE=true next build --webpack",
+    "model": "gltf-transform optimize \"${MODEL_SRC:-$HOME/Downloads/KYC-model/KYC_civic.glb}\" public/models/civic.glb --compress meshopt --texture-compress webp --join false --flatten false --instance false --palette false --simplify false"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

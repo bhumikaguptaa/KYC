@@ -1,69 +1,163 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, m } from "motion/react";
+import { spring } from "@/components/ui/MotionProvider";
+import { DEMO_VIN } from "@/lib/car";
+import { useScene, type Recall, type Vehicle } from "@/lib/scene-context";
+
+type RecallResponse = { recalls: Recall[]; filedUnder: string; exact: boolean };
+
+export default function StartPage() {
+  const router = useRouter();
+  const s = useScene();
+  const { setView, select, setXray, toggle, setGlows, setVehicle, setRecalls } = s;
+  const [vin, setVin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Start screen pose: everything closed, slow turntable.
+  useEffect(() => {
+    setView("start");
+    select(null);
+    setXray(false);
+    setGlows({});
+    (["hood", "frontDoors", "rearDoors", "hatch"] as const).forEach((o) => toggle(o, false));
+  }, [setView, select, setXray, setGlows, toggle]);
+
+  async function decode(value: string, year?: number) {
+    setBusy(true);
+    setError(null);
+    try {
+      const q = new URLSearchParams({ vin: value, ...(year ? { year: String(year) } : {}) });
+      const res = await fetch(`/api/vin?${q}`);
+      const data = (await res.json()) as { vehicle?: Vehicle; error?: string };
+      if (!res.ok || !data.vehicle) throw new Error(data.error ?? "Couldn't decode that VIN.");
+      setVehicle(data.vehicle);
+
+      const v = data.vehicle;
+      const r = await fetch(`/api/recalls?${new URLSearchParams({ make: v.make, model: v.model, year: v.year })}`);
+      if (r.ok) {
+        const rd = (await r.json()) as RecallResponse;
+        setRecalls(rd.recalls, { filedUnder: rd.filedUnder, exact: rd.exact });
+      } else setRecalls([], null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    void decode(vin);
+  };
+
+  const v = s.vehicle;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="flex h-full flex-col justify-end p-5 sm:justify-center sm:p-10">
+      <m.div
+        className="glass pointer-events-auto w-full max-w-md rounded-3xl p-6"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...spring, delay: 0.2 }}
+      >
+        <div className="text-xs font-medium tracking-[0.3em] text-white/50">KYC · KNOW YOUR CAR</div>
+
+        <AnimatePresence mode="wait" initial={false}>
+          {!v ? (
+            <m.div key="enter" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight">Your car, in 3D.</h1>
+              <p className="mt-2 text-sm text-white/60">
+                Enter your VIN to see your exact car, what&apos;s under the hood, and what you can fix yourself.
+              </p>
+              <form onSubmit={onSubmit} className="mt-5 flex gap-2">
+                <input
+                  value={vin}
+                  onChange={(e) => setVin(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17))}
+                  placeholder="17-character VIN"
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm tracking-wider outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-white/30 focus:border-accent/60"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || vin.length !== 17}
+                  className="rounded-xl bg-white px-4 text-sm font-medium text-black transition active:scale-95 disabled:opacity-30"
+                >
+                  Decode
+                </button>
+              </form>
+              <button
+                type="button"
+                onClick={() => void decode(DEMO_VIN.pattern, DEMO_VIN.year)}
+                disabled={busy}
+                className="mt-3 text-sm text-accent transition active:scale-95 disabled:opacity-40"
+              >
+                {busy ? "Decoding…" : "Use demo car →"}
+              </button>
+              {error && <p className="mt-3 text-sm text-shop">{error}</p>}
+            </m.div>
+          ) : (
+            <m.div key="card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={spring}>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+                {v.year} {v.make} {v.model}
+              </h1>
+              <p className="mt-1 text-sm text-white/50">{[v.trim, v.body].filter(Boolean).join(" · ")}</p>
+              <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                <Spec label="Engine" value={v.engine} />
+                <Spec label="Drive" value={v.drive} />
+                <Spec label="Fuel" value={v.fuel} />
+                <Spec label="Built in" value={v.plant} />
+              </dl>
+              <RecallLine recalls={s.recalls} scope={s.recallScope} />
+              <div className="mt-6 flex items-center gap-3">
+                <button
+                  onClick={() => router.push("/garage")}
+                  className="flex-1 rounded-xl bg-white py-3 text-sm font-medium text-black transition active:scale-[0.98]"
+                >
+                  Open my garage
+                </button>
+                <button
+                  onClick={() => {
+                    setVehicle(null);
+                    setRecalls([], null);
+                  }}
+                  className="px-2 text-sm text-white/50"
+                >
+                  Change
+                </button>
+              </div>
+            </m.div>
+          )}
+        </AnimatePresence>
+      </m.div>
     </div>
+  );
+}
+
+function Spec({ label, value }: { label: string; value: string }) {
+  if (!value) return null;
+  return (
+    <div>
+      <dt className="text-xs text-white/40">{label}</dt>
+      <dd className="mt-0.5 text-white/90">{value}</dd>
+    </div>
+  );
+}
+
+function RecallLine({ recalls, scope }: { recalls: Recall[]; scope: { filedUnder: string; exact: boolean } | null }) {
+  if (!scope) return null;
+  if (!recalls.length)
+    return <p className="mt-5 text-sm text-diy">No NHTSA recalls filed for {scope.filedUnder}.</p>;
+  return (
+    <p className="mt-5 text-sm text-advanced">
+      {recalls.length} NHTSA recall{recalls.length > 1 ? "s" : ""} filed for {scope.filedUnder}
+      {!scope.exact && " (check whether yours is included)"}.
+    </p>
   );
 }
