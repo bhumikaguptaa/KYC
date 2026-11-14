@@ -148,6 +148,12 @@ export default function StartPage() {
                   Change
                 </button>
               </div>
+              <button
+                onClick={() => router.push("/quote")}
+                className="mt-2 min-h-12 w-full rounded-xl bg-white/10 text-sm font-medium text-white/90 transition active:scale-[0.98]"
+              >
+                Check a repair quote
+              </button>
             </m.div>
           )}
         </AnimatePresence>

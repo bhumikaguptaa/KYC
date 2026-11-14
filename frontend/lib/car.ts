@@ -17,7 +17,6 @@ export type Part = {
   center: Vec3;
   /** where the camera sits when this part is focused */
   camera: Vec3;
-  guide?: string;
   /**
    * Offer "Take it out" for this part. On for small do-it-yourself parts and parts whose mesh
    * comes out clean; off where the mesh drags neighbouring hoses/brackets along with it.
@@ -159,7 +158,6 @@ export const PARTS: Part[] = [
     about: "Cleans the air going into the engine. A clogged filter costs power and fuel economy.",
     center: [0.457, 0.844, 2.172],
     camera: [1.35, 2.0, 3.55],
-    guide: "air-filter",
   },
   {
     id: "battery",
@@ -177,7 +175,6 @@ export const PARTS: Part[] = [
     about: "Starts the car and powers the electronics while the engine is off.",
     center: [0.491, 0.889, 1.683],
     camera: [1.55, 2.1, 2.9],
-    guide: "battery",
   },
   {
     id: "washer_fluid_cap",
@@ -194,7 +191,6 @@ export const PARTS: Part[] = [
     about: "Fluid for the windshield washers. Top it up whenever the warning shows.",
     center: [-0.946, 1.031, 1.619],
     camera: [-1.9, 2.05, 2.9],
-    guide: "washer-fluid",
   },
   {
     // The wiper whose pivot is on the +X side (the short arm, split out of the wiper mesh at load).

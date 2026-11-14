@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, m } from "motion/react";
+import { PartGuide } from "@/components/guide/PartGuide";
 import { spring } from "@/components/ui/MotionProvider";
 import { PARTS, partById, type PartStatus } from "@/lib/car";
+import { GUIDES } from "@/lib/guides";
+import { isPartId } from "@/lib/quote";
 import { useScene } from "@/lib/scene-context";
 
 const STATUS: Record<PartStatus, { label: string; className: string }> = {
@@ -16,22 +20,29 @@ const STATUS: Record<PartStatus, { label: string; className: string }> = {
 /**
  * The garage keeps its view and selected part in the URL (/garage?view=bay&part=battery), so a
  * reload, a shared link or a relaunch of the installed app comes back to the same place.
+ * guide=1 opens the part's how-to guide on its sheet (the quote's View button links here).
  */
-type UrlState = { view: "garage" | "engineBay" | "part"; part: string | null };
+type UrlState = { view: "garage" | "engineBay" | "part"; part: string | null; guide: boolean };
 
 function readUrl(): UrlState {
   const q = new URLSearchParams(window.location.search);
   const part = partById(q.get("part"))?.id ?? null;
-  if (part) return { view: "part", part };
-  return { view: q.get("view") === "bay" ? "engineBay" : "garage", part: null };
+  if (part) return { view: "part", part, guide: q.get("guide") === "1" };
+  return { view: q.get("view") === "bay" ? "engineBay" : "garage", part: null, guide: false };
 }
 
+const hasGuide = (id: string | null | undefined) => isPartId(id) && !!GUIDES[id];
+
 export default function GaragePage() {
+  const router = useRouter();
   const s = useScene();
   const { setView, select } = s;
   const underHood = s.view === "engineBay" || s.view === "part" || s.view === "explore";
   const exploring = s.view === "explore";
   const part = partById(s.selected);
+  // The how-to guide shows on the part sheet in place of the short text.
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guide = guideOpen && hasGuide(part?.id);
 
   const { toggle, setXray } = s;
 
@@ -39,13 +50,14 @@ export default function GaragePage() {
   const fromUrl = useRef<UrlState | null>(null);
   useEffect(() => {
     fromUrl.current ??= readUrl();
-    const { view, part: id } = fromUrl.current;
+    const { view, part: id, guide: withGuide } = fromUrl.current;
     if (view !== "garage") {
       setXray(false);
       toggle("hood", true);
     }
     select(id);
     setView(view);
+    setGuideOpen(withGuide);
   }, [setView, select, toggle, setXray]);
 
   // Afterwards, keep the URL in step with the view. replaceState, not push: no history pile-up.
@@ -54,9 +66,10 @@ export default function GaragePage() {
     const q = new URLSearchParams();
     if (s.view !== "garage") q.set("view", "bay");
     if ((s.view === "part" || s.view === "explore") && s.selected) q.set("part", s.selected);
+    if (s.view === "part" && guide) q.set("guide", "1");
     const url = q.size ? `/garage?${q}` : "/garage";
     if (url !== window.location.pathname + window.location.search) window.history.replaceState(null, "", url);
-  }, [s.view, s.selected]);
+  }, [s.view, s.selected, guide]);
 
   const enterBay = () => {
     s.setXray(false);
@@ -65,6 +78,7 @@ export default function GaragePage() {
     s.setView("engineBay");
   };
   const leaveBay = () => {
+    setGuideOpen(false);
     s.select(null);
     s.setView("garage");
   };
@@ -91,13 +105,21 @@ export default function GaragePage() {
             </p>
           )}
         </div>
-        {underHood ? (
-          <Pill onClick={leaveBay}>Exit engine bay</Pill>
-        ) : (
-          <Pill onClick={() => s.setXray(!s.xray)} active={s.xray}>
-            X-ray
-          </Pill>
-        )}
+        <div className="flex shrink-0 gap-2">
+          <Link
+            href="/quote"
+            className="glass flex min-h-11 items-center rounded-full px-4 text-sm text-white/75 transition active:scale-95"
+          >
+            Quote
+          </Link>
+          {underHood ? (
+            <Pill onClick={leaveBay}>Exit engine bay</Pill>
+          ) : (
+            <Pill onClick={() => s.setXray(!s.xray)} active={s.xray}>
+              X-ray
+            </Pill>
+          )}
+        </div>
       </m.header>
 
       {/* Part sheet: sits between header and controls on phones, so it never covers the buttons */}
@@ -112,6 +134,15 @@ export default function GaragePage() {
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={spring}
           >
+            {/* Came here from a quote's View button: one tap back to the list. */}
+            {guide && s.quote && (
+              <button
+                onClick={() => router.push("/quote")}
+                className="-mt-2 mb-2 -ml-1 min-h-11 pl-1 pr-4 text-xs font-medium tracking-[0.2em] text-white/50"
+              >
+                ← BACK TO QUOTE
+              </button>
+            )}
             <div className="flex items-start justify-between gap-3">
               {/* Exploring on a phone: badge beside the title, to keep the sheet short. */}
               <div className={exploring ? "flex flex-row-reverse items-center justify-end gap-3 sm:block" : ""}>
@@ -125,6 +156,7 @@ export default function GaragePage() {
               {/* The installed app has no browser back button, so every panel closes itself. */}
               <button
                 onClick={() => {
+                  setGuideOpen(false);
                   s.select(null);
                   s.setView("engineBay");
                 }}
@@ -155,10 +187,20 @@ export default function GaragePage() {
                   Recenter
                 </button>
               </>
+            ) : guide ? (
+              <PartGuide partId={part.id} />
             ) : (
               <>
                 <p className="mt-1 text-sm text-white/65">{part.about}</p>
                 <p className="mt-3 text-sm text-white/90">{part.reason}</p>
+                {hasGuide(part.id) && (
+                  <button
+                    onClick={() => setGuideOpen(true)}
+                    className="mt-4 min-h-11 w-full rounded-xl bg-white/10 text-sm font-medium text-white/90 transition active:scale-[0.98]"
+                  >
+                    How to do it
+                  </button>
+                )}
               </>
             )}
             {part.explorable && (
@@ -169,6 +211,7 @@ export default function GaragePage() {
                 {exploring ? "Put it back" : "Take it out"}
               </button>
             )}
+
             {exploring && (
               <p className="mt-2.5 hidden text-center text-xs text-white/40 sm:block">
                 Drag to turn · pinch or scroll to zoom · two fingers or right-drag to move
@@ -202,6 +245,7 @@ export default function GaragePage() {
                   active={s.selected === p.id}
                   dot={p.status}
                   onClick={() => {
+                    setGuideOpen(false);
                     s.select(p.id);
                     // While exploring, a chip swaps which part is out (if that part can come out).
                     if (!exploring || !p.explorable) s.setView("part");
