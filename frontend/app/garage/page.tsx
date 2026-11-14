@@ -187,6 +187,9 @@ export default function GaragePage() {
               <Pill onClick={() => s.setLights(!s.lights)} active={s.lights}>
                 Lights
               </Pill>
+              <Pill onClick={() => s.setWipers(!s.wipers)} active={s.wipers}>
+                Wipers
+              </Pill>
               <button
                 onClick={enterBay}
                 className="ml-auto rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition active:scale-95"

@@ -60,6 +60,37 @@ export const HINGES = {
 
 export type Openable = keyof typeof HINGES;
 
+/**
+ * Wipers. The model has both arms in one mesh ("FK8.Wipers"), so it is split into its two arms
+ * at load, piece by piece (a piece = a connected bit of the mesh). Each arm rotates about its own
+ * axis through its pivot (the round end at the base of the arm). The glass is curved, so each
+ * axis is tilted from the glass normal to keep that arm's blade riding just above the glass
+ * through the sweep (fitted against the source model: tips stay 0-3 cm above the glass).
+ * Axes point into the glass, so a positive angle sweeps the arm up the windshield.
+ */
+export const WIPERS = {
+  node: "FK8Wipers",
+  /** seconds for one up-and-back stroke */
+  period: 1.3,
+  arms: [
+    {
+      name: "FK8WiperLong",
+      pivot: [0.211, 1.16, 1.46] as Vec3,
+      axis: [-0.051, -0.779, -0.625] as Vec3,
+      sweep: 90,
+      // The long arm's pieces sit toward the nose (its lower run) or out on the passenger side.
+      owns: (c: Vec3) => c[2] > 1.405 || c[0] < -0.38,
+    },
+    {
+      name: "FK8WiperShort",
+      pivot: [0.716, 1.12, 1.374] as Vec3,
+      axis: [-0.205, -0.794, -0.572] as Vec3,
+      sweep: 80,
+      owns: () => true,
+    },
+  ],
+};
+
 /** Meshes that become see-through glass in X-ray mode (the exterior shell). */
 export const SHELL_NODES = [
   "Fk8Body",

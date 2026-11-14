@@ -39,6 +39,8 @@ type SceneState = {
   toggle: (o: Openable, value?: boolean) => void;
   lights: boolean;
   setLights: (v: boolean) => void;
+  wipers: boolean;
+  setWipers: (v: boolean) => void;
   xray: boolean;
   setXray: (v: boolean) => void;
   selected: string | null;
@@ -69,6 +71,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     hatch: false,
   });
   const [lights, setLights] = useState(false);
+  const [wipers, setWipers] = useState(false);
   const [xray, setXray] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [glows, setGlows] = useState<Record<string, Glow>>({});
@@ -97,6 +100,8 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       toggle,
       lights,
       setLights,
+      wipers,
+      setWipers,
       xray,
       setXray,
       selected,
@@ -113,7 +118,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       recallScope,
       setRecalls,
     }),
-    [view, open, toggle, lights, xray, selected, glows, modelReady, vehicle, recenterKey, recenter, recalls, recallScope, setRecalls],
+    [view, open, toggle, lights, wipers, xray, selected, glows, modelReady, vehicle, recenterKey, recenter, recalls, recallScope, setRecalls],
   );
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;

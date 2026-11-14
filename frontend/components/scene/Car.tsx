@@ -14,6 +14,7 @@ import {
   PARTS,
   SHELL_NODES,
   SOLID_IN_XRAY_MATERIALS,
+  WIPERS,
   partById,
   type Openable,
 } from "@/lib/car";
@@ -47,6 +48,91 @@ const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0) };
 const EXPLORE_POINT = new THREE.Vector3(...EXPLORE.point);
 const noRaycast = () => {};
 
+type WiperRig = { pivot: THREE.Group; axis: THREE.Vector3; sweep: number };
+
+/**
+ * Split the wiper mesh into its two arms and hang each on a pivot group. The mesh is welded by
+ * position into connected pieces; each piece goes to the first arm whose `owns` accepts the
+ * piece's centre (world space). The arms share the original vertex data, only the index differs.
+ */
+function rigWipers(scene: THREE.Group): WiperRig[] {
+  const src = scene.getObjectByName(WIPERS.node) as THREE.Mesh | undefined;
+  if (!src?.isMesh || !src.parent) {
+    console.warn(`[KYC] wiper mesh missing: ${WIPERS.node}`);
+    return [];
+  }
+  const geo = src.geometry;
+  const pos = geo.getAttribute("position");
+  const index = geo.index ? Array.from(geo.index.array) : [...Array(pos.count).keys()];
+
+  // World positions, and one id per distinct position (welds seams split for normals/UVs).
+  const world = Array.from({ length: pos.count }, (_, i) =>
+    new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(src.matrixWorld),
+  );
+  const byKey = new Map<string, number>();
+  const weld = world.map((v, i) => {
+    const key = `${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)}`;
+    if (!byKey.has(key)) byKey.set(key, i);
+    return byKey.get(key)!;
+  });
+  const parent = weld.map((_, i) => i);
+  const find = (a: number): number => {
+    while (parent[a] !== a) a = parent[a] = parent[parent[a]];
+    return a;
+  };
+  for (let t = 0; t < index.length; t += 3) {
+    const a = find(weld[index[t]]);
+    parent[find(weld[index[t + 1]])] = a;
+    parent[find(weld[index[t + 2]])] = a;
+  }
+
+  // Centre of each piece, then which arm it belongs to.
+  const sums = new Map<number, { sum: THREE.Vector3; n: number }>();
+  world.forEach((v, i) => {
+    const root = find(weld[i]);
+    const e = sums.get(root) ?? { sum: new THREE.Vector3(), n: 0 };
+    e.sum.add(v);
+    e.n++;
+    sums.set(root, e);
+  });
+  const armOf = new Map<number, number>();
+  for (const [root, { sum, n }] of sums) {
+    const c = sum.divideScalar(n);
+    armOf.set(root, WIPERS.arms.findIndex((arm) => arm.owns([c.x, c.y, c.z])));
+  }
+
+  const holder = new THREE.Group();
+  holder.name = WIPERS.node; // keeps the shell / X-ray lookup by name working
+  src.parent.add(holder);
+  const rigs = WIPERS.arms.map((arm, k) => {
+    const tris: number[] = [];
+    for (let t = 0; t < index.length; t += 3) if (armOf.get(find(weld[index[t]])) === k) tris.push(index[t], index[t + 1], index[t + 2]);
+    const part = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(geo.attributes)) part.setAttribute(name, attr);
+    part.setIndex(tris);
+    const mesh = new THREE.Mesh(part, src.material);
+    mesh.name = arm.name;
+    mesh.userData.wipers = true;
+    // Same placement as the original mesh, then onto a pivot at the arm's base.
+    mesh.matrixAutoUpdate = src.matrixAutoUpdate;
+    mesh.position.copy(src.position);
+    mesh.quaternion.copy(src.quaternion);
+    mesh.scale.copy(src.scale);
+    const pivot = new THREE.Group();
+    pivot.name = `${arm.name}Pivot`;
+    pivot.position.set(...arm.pivot);
+    holder.add(pivot);
+    src.parent!.add(mesh);
+    holder.updateMatrixWorld(true);
+    pivot.attach(mesh);
+    const axis = new THREE.Vector3(...arm.axis).normalize();
+    return { pivot, axis, sweep: THREE.MathUtils.degToRad(arm.sweep), tris: tris.length / 3 };
+  });
+  src.removeFromParent();
+  if (rigs.some((r) => r.tris === 0)) console.warn("[KYC] a wiper arm got no geometry");
+  return rigs.map(({ pivot, axis: a, sweep }) => ({ pivot, axis: a, sweep }));
+}
+
 /** Build all the lookups for a loaded model. Mutates the scene, so it must run once per scene. */
 function buildRig(scene: THREE.Group) {
   const byName = (name: string) => scene.getObjectByName(name);
@@ -77,6 +163,8 @@ function buildRig(scene: THREE.Group) {
       return [{ node: pivot, closed, open: turn.multiply(closed) }];
     });
   }
+
+  const wipers = rigWipers(scene);
 
   // Openable panels: tapping the hood, a door or the hatch toggles it.
   const openableByNode: Record<string, Openable> = {};
@@ -228,6 +316,9 @@ function buildRig(scene: THREE.Group) {
 
   return {
     hinges,
+    wipers,
+    /** wiper stroke progress in strokes; whole numbers are the parked position */
+    wiperPhase: { v: 0 },
     parts,
     shell,
     all,
@@ -260,6 +351,7 @@ type Pose = {
   view: View;
   open: Record<Openable, boolean>;
   lights: boolean;
+  wipers: boolean;
   xray: boolean;
   selected: string | null;
   glows: Record<string, Glow>;
@@ -312,6 +404,16 @@ function animate(r: Rig, pose: Pose, delta: number) {
 
   for (const key of Object.keys(r.hinges) as Openable[])
     for (const h of r.hinges[key]) easing.dampQ(h.node.quaternion, pose.open[key] ? h.open : h.closed, 0.32, delta);
+
+  // Wipers: sweep up and back while on; when switched off, finish the stroke and park.
+  const phase = r.wiperPhase;
+  const parked = phase.v === Math.floor(phase.v);
+  if (pose.wipers || !parked) {
+    const next = phase.v + delta / WIPERS.period;
+    phase.v = !pose.wipers && Math.floor(next) > Math.floor(phase.v) ? Math.floor(next) : next;
+  }
+  const stroke = 0.5 - 0.5 * Math.cos(phase.v * Math.PI * 2); // 0 parked .. 1 top of the sweep
+  for (const w of r.wipers) w.pivot.quaternion.setFromAxisAngle(w.axis, w.sweep * stroke);
 
   easing.damp(r.lightLevel, "v", pose.lights ? 1 : 0, 0.18, delta);
   for (const m of r.lightMats.front) m.emissiveIntensity = r.lightLevel.v * 6;
@@ -372,6 +474,11 @@ export function Car() {
       if (s.view !== "explore" || !partById(partId)?.explorable) s.setView("part");
       return;
     }
+    if (obj.userData.wipers && !ghost) {
+      e.stopPropagation();
+      s.setWipers(!s.wipers);
+      return;
+    }
     const openable = obj.userData.openable as Openable | undefined;
     if (openable && !ghost) {
       e.stopPropagation();
@@ -381,7 +488,7 @@ export function Car() {
 
   const onOver = (e: ThreeEvent<PointerEvent>) => {
     const d = e.object.userData;
-    if (d.partId || (d.openable && !ghost)) document.body.style.cursor = "pointer";
+    if (d.partId || ((d.openable || d.wipers) && !ghost)) document.body.style.cursor = "pointer";
   };
   const onOut = () => {
     document.body.style.cursor = "";
