@@ -17,7 +17,7 @@ export function QuoteList({ items }: { items: QuoteItem[] }) {
   return (
     <>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
-        <Stat label="Quote total" value={usd(total)} />
+        <Stat label="Repairs total" value={usd(total)} />
         <Stat label="You could do" value={diy.length ? usd(diyTotal) : "—"} tone="text-diy" />
         <Stat label="High prices" value={String(high)} tone={high ? "text-shop" : undefined} />
       </dl>

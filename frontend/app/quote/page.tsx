@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { m } from "motion/react";
 import { spring } from "@/components/ui/MotionProvider";
 import { QuoteList } from "@/components/quote/QuoteList";
+import { QuoteUpload } from "@/components/quote/QuoteUpload";
 import { QUOTE_FIXTURE } from "@/lib/quote-fixture";
 import { useScene, type Glow } from "@/lib/scene-context";
 
@@ -65,20 +66,22 @@ export default function QuotePage() {
             See what each line costs, which prices look high, and what you could do yourself.
           </p>
 
-          {/* Stands in for the PDF upload until it lands (plan step A1). */}
-          <button
-            onClick={() => setQuote(QUOTE_FIXTURE)}
-            className="mt-4 min-h-12 w-full rounded-xl bg-white text-sm font-medium text-black transition active:scale-[0.98]"
-          >
-            {hasQuote ? "Reload sample quote" : "Load sample quote"}
-          </button>
-          {process.env.NODE_ENV === "development" && (
-            <div className="mt-2 flex gap-3 text-xs text-white/35">
-              <span>Test:</span>
-              <button onClick={() => setQuote([])}>empty</button>
-              <button onClick={() => setQuote(QUOTE_FIXTURE.slice(0, 1))}>one line</button>
-            </div>
-          )}
+          <div className="mt-4">
+            <QuoteUpload />
+          </div>
+          {/* A made-up quote: shows how the app works without a PDF, a password or API credit. */}
+          <div className="mt-1 flex items-center gap-3 text-xs text-white/40">
+            <button onClick={() => setQuote(QUOTE_FIXTURE)} className="-my-2 min-h-11 text-accent">
+              Try a sample quote
+            </button>
+            {process.env.NODE_ENV === "development" && (
+              <>
+                <span>Test:</span>
+                <button onClick={() => setQuote([])}>empty</button>
+                <button onClick={() => setQuote(QUOTE_FIXTURE.slice(0, 1))}>one line</button>
+              </>
+            )}
+          </div>
 
           {quote && <QuoteList items={quote} />}
         </div>
