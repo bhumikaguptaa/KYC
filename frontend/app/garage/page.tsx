@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, m } from "motion/react";
 import { spring } from "@/components/ui/MotionProvider";
@@ -13,16 +13,49 @@ const STATUS: Record<PartStatus, { label: string; className: string }> = {
   shop: { label: "Mechanic only", className: "bg-shop/15 text-shop" },
 };
 
+/**
+ * The garage keeps its view and selected part in the URL (/garage?view=bay&part=battery), so a
+ * reload, a shared link or a relaunch of the installed app comes back to the same place.
+ */
+type UrlState = { view: "garage" | "engineBay" | "part"; part: string | null };
+
+function readUrl(): UrlState {
+  const q = new URLSearchParams(window.location.search);
+  const part = partById(q.get("part"))?.id ?? null;
+  if (part) return { view: "part", part };
+  return { view: q.get("view") === "bay" ? "engineBay" : "garage", part: null };
+}
+
 export default function GaragePage() {
   const s = useScene();
   const { setView, select } = s;
   const underHood = s.view === "engineBay" || s.view === "part";
   const part = partById(s.selected);
 
+  const { toggle, setXray } = s;
+
+  // On arrival, restore the view from the URL. Read once: the ref survives React's dev double-run.
+  const fromUrl = useRef<UrlState | null>(null);
   useEffect(() => {
-    setView("garage");
-    select(null);
-  }, [setView, select]);
+    fromUrl.current ??= readUrl();
+    const { view, part: id } = fromUrl.current;
+    if (view !== "garage") {
+      setXray(false);
+      toggle("hood", true);
+    }
+    select(id);
+    setView(view);
+  }, [setView, select, toggle, setXray]);
+
+  // Afterwards, keep the URL in step with the view. replaceState, not push: no history pile-up.
+  useEffect(() => {
+    if (s.view === "start") return; // still showing the previous page's state
+    const q = new URLSearchParams();
+    if (s.view !== "garage") q.set("view", "bay");
+    if (s.view === "part" && s.selected) q.set("part", s.selected);
+    const url = q.size ? `/garage?${q}` : "/garage";
+    if (url !== window.location.pathname + window.location.search) window.history.replaceState(null, "", url);
+  }, [s.view, s.selected]);
 
   const enterBay = () => {
     s.setXray(false);
@@ -38,7 +71,7 @@ export default function GaragePage() {
   const title = s.vehicle ? `${s.vehicle.year} ${s.vehicle.make} ${s.vehicle.model}` : "Honda Civic Type R";
 
   return (
-    <div className="flex h-full flex-col justify-between p-4 sm:p-6">
+    <div className="flex h-full flex-col p-4 sm:p-6">
       {/* Top bar */}
       <m.header
         className="pointer-events-auto flex items-start justify-between gap-3"
@@ -47,7 +80,7 @@ export default function GaragePage() {
         transition={spring}
       >
         <div>
-          <Link href="/" className="text-xs font-medium tracking-[0.3em] text-white/45">
+          <Link href="/" className="-my-3 inline-block py-3 pr-4 text-xs font-medium tracking-[0.3em] text-white/45">
             ← KYC
           </Link>
           <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
@@ -66,26 +99,41 @@ export default function GaragePage() {
         )}
       </m.header>
 
-      {/* Part sheet */}
+      {/* Part sheet: sits between header and controls on phones, so it never covers the buttons */}
+      <div className="flex min-h-0 flex-1 items-end py-3 sm:items-start sm:justify-end sm:py-4">
       <AnimatePresence>
         {part && (
           <m.section
             key={part.id}
-            className="glass pointer-events-auto absolute inset-x-4 bottom-28 rounded-3xl p-5 sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-auto sm:w-80"
+            className="glass pointer-events-auto max-h-full w-full overflow-y-auto overscroll-contain rounded-3xl p-5 sm:w-80"
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={spring}
           >
-            <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${STATUS[part.status].className}`}>
-              {STATUS[part.status].label}
-            </span>
+            <div className="flex items-start justify-between gap-3">
+              <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${STATUS[part.status].className}`}>
+                {STATUS[part.status].label}
+              </span>
+              {/* The installed app has no browser back button, so every panel closes itself. */}
+              <button
+                onClick={() => {
+                  s.select(null);
+                  s.setView("engineBay");
+                }}
+                aria-label="Close part details"
+                className="-m-3 grid size-11 shrink-0 place-items-center text-white/50 transition active:scale-90"
+              >
+                ✕
+              </button>
+            </div>
             <h2 className="mt-3 text-lg font-semibold">{part.label}</h2>
             <p className="mt-1 text-sm text-white/65">{part.about}</p>
             <p className="mt-3 text-sm text-white/90">{part.reason}</p>
           </m.section>
         )}
       </AnimatePresence>
+      </div>
 
       {/* Bottom controls */}
       <m.footer
@@ -121,7 +169,7 @@ export default function GaragePage() {
           ) : (
             <m.div
               key="controls"
-              className="flex flex-wrap items-center gap-2"
+              className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
@@ -144,7 +192,7 @@ export default function GaragePage() {
               </Pill>
               <button
                 onClick={enterBay}
-                className="ml-auto rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition active:scale-95"
+                className="order-first min-h-11 shrink-0 rounded-full bg-white px-5 text-sm font-medium text-black transition active:scale-95 sm:order-last sm:ml-auto"
               >
                 Under the hood
               </button>
@@ -171,7 +219,7 @@ function Pill({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`glass flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm transition active:scale-95 ${
+      className={`glass flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm transition active:scale-95 ${
         active ? "border-accent/60 text-white" : "text-white/75"
       }`}
     >
