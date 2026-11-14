@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { Openable } from "./car";
+import type { QuoteItem } from "./quote";
 
 /**
  * Which camera framing the scene should fly to. Pages set this; the CameraRig reacts.
@@ -58,6 +59,9 @@ type SceneState = {
   /** what NHTSA filed the recalls under, and whether that is this exact model or its family */
   recallScope: { filedUnder: string; exact: boolean } | null;
   setRecalls: (r: Recall[], scope: { filedUnder: string; exact: boolean } | null) => void;
+  /** lines read from the uploaded repair quote; null until a quote has been read */
+  quote: QuoteItem[] | null;
+  setQuote: (q: QuoteItem[] | null) => void;
 };
 
 const SceneContext = createContext<SceneState | null>(null);
@@ -81,6 +85,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const recenter = useCallback(() => setRecenterKey((k) => k + 1), []);
   const [recalls, setRecallList] = useState<Recall[]>([]);
   const [recallScope, setRecallScope] = useState<SceneState["recallScope"]>(null);
+  const [quote, setQuote] = useState<QuoteItem[] | null>(null);
 
   // Stable callbacks so pages can list them as effect dependencies without re-running every render.
   const toggle = useCallback(
@@ -117,8 +122,10 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       recalls,
       recallScope,
       setRecalls,
+      quote,
+      setQuote,
     }),
-    [view, open, toggle, lights, wipers, xray, selected, glows, modelReady, vehicle, recenterKey, recenter, recalls, recallScope, setRecalls],
+    [view, open, toggle, lights, wipers, xray, selected, glows, modelReady, vehicle, recenterKey, recenter, recalls, recallScope, setRecalls, quote],
   );
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;
