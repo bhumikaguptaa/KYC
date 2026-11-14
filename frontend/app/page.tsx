@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, m } from "motion/react";
 import { spring } from "@/components/ui/MotionProvider";
+import { InstallHint } from "@/components/ui/InstallHint";
 import { DEMO_VIN } from "@/lib/car";
 import { useScene, type Recall, type Vehicle } from "@/lib/scene-context";
 
@@ -36,14 +37,20 @@ export default function StartPage() {
       if (!res.ok || !data.vehicle) throw new Error(data.error ?? "Couldn't decode that VIN.");
       setVehicle(data.vehicle);
 
+      // Recalls are a bonus: if they fail (for example offline), the car card still shows.
       const v = data.vehicle;
-      const r = await fetch(`/api/recalls?${new URLSearchParams({ make: v.make, model: v.model, year: v.year })}`);
-      if (r.ok) {
+      try {
+        const r = await fetch(`/api/recalls?${new URLSearchParams({ make: v.make, model: v.model, year: v.year })}`);
+        if (!r.ok) throw new Error();
         const rd = (await r.json()) as RecallResponse;
         setRecalls(rd.recalls, { filedUnder: rd.filedUnder, exact: rd.exact });
-      } else setRecalls([], null);
+      } catch {
+        setRecalls([], null);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      // fetch rejects with a TypeError when there is no network (and nothing saved to fall back on).
+      if (!navigator.onLine || e instanceof TypeError) setError("You're offline. Connect to the internet to look up a VIN.");
+      else setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setBusy(false);
     }
@@ -59,7 +66,7 @@ export default function StartPage() {
   return (
     <div className="flex h-full flex-col justify-end p-5 sm:justify-center sm:p-10">
       <m.div
-        className="glass pointer-events-auto w-full max-w-md rounded-3xl p-6"
+        className="glass pointer-events-auto w-full max-w-md rounded-3xl p-5 sm:p-6"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...spring, delay: 0.2 }}
@@ -76,31 +83,40 @@ export default function StartPage() {
               <form onSubmit={onSubmit} className="mt-5 flex gap-2">
                 <input
                   value={vin}
-                  onChange={(e) => setVin(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17))}
+                  onChange={(e) => setVin(e.target.value.toUpperCase().replace(/[^A-Z0-9*]/g, "").slice(0, 17))}
                   placeholder="17-character VIN"
                   inputMode="text"
                   autoCapitalize="characters"
                   autoCorrect="off"
                   spellCheck={false}
-                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm tracking-wider outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-white/30 focus:border-accent/60"
+                  className="min-w-0 flex-1 min-h-12 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-mono text-base tracking-wider outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-white/30 focus:border-accent/60"
                 />
                 <button
                   type="submit"
                   disabled={busy || vin.length !== 17}
-                  className="rounded-xl bg-white px-4 text-sm font-medium text-black transition active:scale-95 disabled:opacity-30"
+                  className="min-h-12 rounded-xl bg-white px-5 text-sm font-medium text-black transition active:scale-95 disabled:opacity-30"
                 >
                   Decode
                 </button>
               </form>
               <button
                 type="button"
-                onClick={() => void decode(DEMO_VIN.pattern, DEMO_VIN.year)}
+                onClick={() => {
+                  // Fill the field first, so the demo VIN shows even when the lookup cannot run (offline).
+                  setVin(DEMO_VIN.pattern);
+                  void decode(DEMO_VIN.pattern, DEMO_VIN.year);
+                }}
                 disabled={busy}
-                className="mt-3 text-sm text-accent transition active:scale-95 disabled:opacity-40"
+                className="mt-2 -mx-2 min-h-11 px-2 text-sm text-accent transition active:scale-95 disabled:opacity-40"
               >
                 {busy ? "Decoding…" : "Use demo car →"}
               </button>
-              {error && <p className="mt-3 text-sm text-shop">{error}</p>}
+              {error && (
+                <p role="alert" className="mt-3 text-sm text-shop">
+                  {error}
+                </p>
+              )}
+              <InstallHint />
             </m.div>
           ) : (
             <m.div key="card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={spring}>
@@ -118,7 +134,7 @@ export default function StartPage() {
               <div className="mt-6 flex items-center gap-3">
                 <button
                   onClick={() => router.push("/garage")}
-                  className="flex-1 rounded-xl bg-white py-3 text-sm font-medium text-black transition active:scale-[0.98]"
+                  className="min-h-12 flex-1 rounded-xl bg-white py-3 text-sm font-medium text-black transition active:scale-[0.98]"
                 >
                   Open my garage
                 </button>
@@ -127,7 +143,7 @@ export default function StartPage() {
                     setVehicle(null);
                     setRecalls([], null);
                   }}
-                  className="px-2 text-sm text-white/50"
+                  className="min-h-11 px-3 text-sm text-white/50"
                 >
                   Change
                 </button>

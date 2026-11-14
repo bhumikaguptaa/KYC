@@ -15,6 +15,7 @@ Next.js (App Router) on Vercel, React Three Fiber for 3D, and no extra state lib
 | Styling | Tailwind CSS v4, Geist font | Speed and one consistent type system; load only the Geist weights used |
 | State | React context in the root layout + URL (route and search params); refs for anything per-frame | Enough for one car; add Zustand only if context re-renders hurt frame rate |
 | Installable app | app/manifest.ts + icons + appleWebApp metadata (iOS) | Opens full-screen from the home screen, no browser bar |
+| Offline and updates | Serwist (`@serwist/next` + `@serwist/cli`): `app/sw.ts` is built to `public/sw.js` by `serwist build` after `next build`. Precaches the app shell, pages, fonts and the car model; stale-while-revalidate for VIN and recall lookups | The installed app opens and shows the 3D car with no network. Service worker only: adds almost nothing to the client bundle. `next-pwa` is unmaintained |
 | VIN entry | A VIN entry field plus a demo-VIN button that fills it in automatically. No VIN scanning in the demo | Fastest path through the demo; no camera or barcode library needed |
 | VIN data | NHTSA vPIC DecodeVinValuesExtended (docs) | Free, no key, real data |
 | Recalls | NHTSA api.nhtsa.gov/recalls/recallsByVehicle?make=&model=&modelYear= (example) | Free, keyless, real campaigns |

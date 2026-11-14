@@ -10,11 +10,21 @@
 
 html,
 body {
+  height: 100%;
   background: #0a0a0b;
   color: #f5f5f7;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+/* Real typing needs selection and the iOS caret. */
+input {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Keep panels clear of the notch and home bar when installed to the home screen. */
