@@ -11,13 +11,14 @@ import { ModeSwitch } from "@/components/ui/ModeSwitch";
 import { IconBack, IconReceipt } from "@/components/ui/icons";
 import { Lamp } from "@/components/ui/status";
 import { QUOTE_FIXTURE } from "@/lib/quote-fixture";
-import { useScene, type Glow } from "@/lib/scene-context";
+import { quoteGlows } from "@/lib/quote";
+import { useScene } from "@/lib/scene-context";
 import { tick, useWide } from "@/lib/ui";
 
 /**
  * Check a repair quote. Before a quote: the car waits outside and the page asks for the PDF.
- * Once it's read, the hood opens, every quoted part lights up (green: do it yourself, red: the
- * shop's job) and the quote comes back as a marked-up paper slip. Tapping a line flies to its part.
+ * Once it's read, the hood opens, every quoted part lights up in its verdict's colour and the
+ * quote comes back as a marked-up paper slip. Tapping a line flies to its part.
  */
 export default function QuotePage() {
   const router = useRouter();
@@ -35,17 +36,11 @@ export default function QuotePage() {
     setView(hasQuote ? "engineBay" : "garage");
   }, [hasQuote, select, setXray, toggle, setView]);
 
-  // Glow each quoted part: green when you can do the job yourself, red otherwise. A new quote
+  // Glow each quoted part in its verdict's colour: green yourself, amber careful, red mechanic. A new quote
   // replaces the glows; leaving the page clears them.
   useEffect(() => {
     if (!quote) return;
-    const glows: Record<string, Glow> = {};
-    for (const item of quote) {
-      if (!item.relevantPart) continue;
-      if (item.canDIY) glows[item.relevantPart] = "diy";
-      else glows[item.relevantPart] ??= "shop";
-    }
-    setGlows(glows);
+    setGlows(quoteGlows(quote));
     return () => setGlows({});
   }, [quote, setGlows]);
 
@@ -119,8 +114,8 @@ export default function QuotePage() {
                 <span className="block text-chalk/40">from the shop?</span>
               </h2>
               <p className="mt-3 text-[15px] leading-snug text-chalk/65">
-                Upload it. We&apos;ll read every line, flag prices that look high, and show you which jobs you could do
-                yourself, right on your car.
+                Upload it. We&apos;ll go through every line, flag prices above average, and show you which jobs you
+                could do yourself, right on your car.
               </p>
               <div className="mt-5">
                 <QuoteUpload />

@@ -25,6 +25,11 @@
   --color-diy: var(--color-go);
   --color-advanced: var(--color-caution);
   --color-shop: var(--color-stop);
+  /* A quote line's "Careful" verdict is the advanced status. */
+  --color-careful: var(--color-caution);
+  /* A price above the average: highlighter yellow, a fact about money rather than a tell-tale,
+     so it never reads as one of the three verdict colours. */
+  --color-pricey: #ffe14d;
 
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }

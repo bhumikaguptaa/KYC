@@ -3,17 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { animate, m } from "motion/react";
 import { partById } from "@/lib/car";
-import type { PartId, QuoteItem } from "@/lib/quote";
+import { quoteStatus, type PartId, type QuoteItem, type QuoteStatus } from "@/lib/quote";
 import { tick } from "@/lib/ui";
 
 export const usd = (n: number, cents = true) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 })}`;
 
-/** Rubber-stamp inks on the paper: the dashboard's go green and stop red, darkened to read on cream. */
-const STAMP = {
-  DIY: "text-[#12804a] border-[#12804a]",
-  SHOP: "text-[#c4271c] border-[#c4271c]",
-} as const;
+/**
+ * The verdict stamps, in the dashboard's go green, caution amber and stop red, darkened into
+ * rubber-stamp inks that read on cream paper. The words match the garage's status labels.
+ */
+const STAMP: Record<QuoteStatus, { word: string; ink: string; said: string }> = {
+  diy: { word: "DIY", ink: "text-[#12804a] border-[#12804a]", said: "You could do this yourself" },
+  careful: { word: "CAREFUL", ink: "text-[#b25e00] border-[#b25e00]", said: "Possible at home, with care" },
+  mechanic: { word: "MECHANIC", ink: "text-[#c4271c] border-[#c4271c]", said: "A job for a mechanic" },
+};
 
 /** The slip's paper: perforated top and bottom edges, cut with a mask. */
 const PERFORATION =
@@ -21,8 +25,8 @@ const PERFORATION =
 
 /**
  * A repair quote, reprinted as a shop's paper repair order and marked up the way a friend who
- * knows cars would: a green DIY or red SHOP stamp on every line, and an amber highlighter over
- * any price that looks high. The stamps land one line at a time once `play` is true.
+ * knows cars would: a DIY, CAREFUL or MECHANIC stamp on every line, and a yellow highlighter
+ * over any price above the average. The stamps land one line at a time once `play` is true.
  *
  * Lines that match a part are tappable (`onPick`), so the car can fly to that part; do-it-yourself
  * lines get a "Show me how" link (`onGuide`).
@@ -127,8 +131,8 @@ export function QuoteSlip({
             <span className="tabular-nums">{usd(total)}</span>
           </div>
           {high > 0 && (
-            <div className="flex justify-between text-[#8a5200]">
-              <span>PRICES THAT LOOK HIGH</span>
+            <div className="flex justify-between text-[#1b1b1d]/70">
+              <span>PRICES ABOVE AVERAGE</span>
               <span className="tabular-nums">
                 {high} line{high === 1 ? "" : "s"}
               </span>
@@ -141,7 +145,7 @@ export function QuoteSlip({
         </div>
       )}
       <p className="mt-5 text-center text-[10px] leading-relaxed tracking-[0.14em] text-[#1b1b1d]/45">
-        {sample ? "SAMPLE QUOTE · MADE-UP PRICES" : "“HIGH” IS AN ESTIMATE AGAINST TYPICAL US SHOP PRICES"}
+        {sample ? "SAMPLE QUOTE · MADE-UP PRICES" : "AVERAGES ARE TYPICAL US SHOP PRICES FOR THE JOB"}
       </p>
     </div>
   );
@@ -164,7 +168,7 @@ function SlipLine({
 }) {
   const part = partById(item.relevantPart);
   const pickable = !!(onPick && item.relevantPart);
-  const stamp = item.canDIY ? "DIY" : "SHOP";
+  const stamp = STAMP[quoteStatus(item)];
   // Picked from the car (a pin tap): bring the line into view.
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -206,7 +210,7 @@ function SlipLine({
             {part ? (
               <>
                 {part.label}
-                {pickable && <span className="text-[#3f6fe0]"> · {selected ? "on the car" : "show on car"}</span>}
+                {pickable && <span className="whitespace-nowrap text-[#3f6fe0]"> · {selected ? "on the car" : "show on car"}</span>}
               </>
             ) : (
               "Not a part on the 3D car"
@@ -217,18 +221,18 @@ function SlipLine({
             <span className="relative inline-grid">
               {/* Placeholder keeps the line from jumping when the stamp lands. */}
               <span aria-hidden className="invisible border-[2.5px] px-2 py-0.5 text-[13px] font-black tracking-[0.18em]">
-                {stamp}
+                {stamp.word}
               </span>
               {stamped && (
                 <m.span
-                  aria-label={item.canDIY ? "You could do this yourself" : "A job for the shop"}
-                  className={`absolute inset-0 rounded-[3px] border-[2.5px] px-2 py-0.5 text-[13px] font-black tracking-[0.18em] mix-blend-multiply ${STAMP[stamp]}`}
+                  aria-label={stamp.said}
+                  className={`absolute inset-0 rounded-[3px] border-[2.5px] px-2 py-0.5 text-[13px] font-black tracking-[0.18em] mix-blend-multiply ${stamp.ink}`}
                   initial={{ scale: 2.4, opacity: 0, rotate: -24 }}
                   animate={{ scale: 1, opacity: 0.88, rotate: at % 2 ? 4 : -5 }}
                   transition={{ type: "spring", stiffness: 700, damping: 22 }}
                   style={{ maskImage: "radial-gradient(circle at 30% 40%, #000 60%, rgb(0 0 0 / 0.75))" }}
                 >
-                  {stamp}
+                  {stamp.word}
                 </m.span>
               )}
             </span>
@@ -247,11 +251,11 @@ function SlipLine({
         </div>
         <div className="shrink-0 text-right">
           <span className="relative inline-block px-1 tabular-nums">
-            {/* Amber highlighter swiped over a price that looks high. */}
+            {/* Yellow highlighter swiped over a price above the average. */}
             {item.isHighPrice && (
               <m.span
                 aria-hidden
-                className="absolute -inset-x-0.5 inset-y-[-1px] -skew-x-6 origin-left rounded-[2px] bg-[#ffb224]/75 mix-blend-multiply"
+                className="absolute -inset-x-0.5 inset-y-[-1px] -skew-x-6 origin-left rounded-[2px] bg-[#ffe14d] mix-blend-multiply"
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: stamped ? 1 : 0 }}
                 transition={{ duration: 0.45, ease: [0.65, 0, 0.35, 1], delay: 0.18 }}
@@ -260,8 +264,8 @@ function SlipLine({
             <span className="relative">{usd(item.amount)}</span>
           </span>
           {item.isHighPrice && (
-            <div className={`mt-1 text-[10px] font-semibold tracking-[0.12em] text-[#8a5200] transition-opacity duration-300 ${stamped ? "" : "opacity-0"}`}>
-              ▲ LOOKS HIGH
+            <div className={`ml-auto mt-1 max-w-[5.5rem] text-[10px] font-semibold leading-tight tracking-[0.12em] text-[#1b1b1d]/70 transition-opacity duration-300 ${stamped ? "" : "opacity-0"}`}>
+              ▲ ABOVE AVERAGE
             </div>
           )}
         </div>
