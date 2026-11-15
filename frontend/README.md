@@ -22,19 +22,27 @@ Before pushing: `npm run typecheck && npm run lint && npm run build`.
 app/
   layout.tsx            SceneProvider + <SceneMount/> (the canvas) + panels on top
   page.tsx              Start: VIN entry, demo car, specs + recalls card
-  garage/page.tsx       Garage: hood/doors/hatch/lights, X-ray, under the hood, part sheet
+  garage/page.tsx       Garage: hood/doors/hatch/lights, X-ray, under the hood, part sheet + how-to
+  quote/page.tsx        Repair quote: upload the PDF, get it back as a marked-up slip on the car
+  api/quote/route.ts    Reads a quote PDF with Claude (see quote-pipeline-plan.md)
   api/vin/route.ts      NHTSA vPIC decode (wildcards allowed for the demo pattern)
   api/recalls/route.ts  NHTSA recalls by make/model/year
   manifest.ts           Add-to-home-screen
 components/scene/       Scene (Canvas), Car (model rig), CameraRig, Studio, xray-material,
                         Hotspots (labels on the car: "Open hood", part lights in the bay)
 components/ui/          MotionProvider (LazyMotion domMax + shared springs), LoadingVeil (bulb check),
-                        VinPlate (17-character VIN readout), status (tell-tale colours), icons
+                        VinPlate (17-character VIN readout), status (tell-tale colours), icons,
+                        ModeSwitch (Outside / Under the hood / Quote, the same bar on every page)
+components/quote/       QuoteUpload (password, PDF slot, reading state), QuoteSlip (the paper slip:
+                        DIY/SHOP stamps, amber highlighter on high prices, tap a line to see the part)
+components/guide/       PartGuide (tools + steps you tick off), VideoEmbed (loads YouTube on tap only)
 lib/palette.ts          The tell-tale colours for three.js (mirrors the @theme block in globals.css)
 lib/hotspots.ts         Where the on-car labels sit
 lib/ui.ts               tick() haptics, useWide(), one-off hint memory
 lib/car.ts              Everything about the Civic: hinges, parts, camera poses
-lib/scene-context.tsx   Shared state: view, open panels, lights, x-ray, selection, glows, vehicle
+lib/scene-context.tsx   Shared state: view, open panels, lights, x-ray, selection, glows, vehicle,
+                        quote, frameOffset (a page sliding the car clear of its panels)
+lib/quote.ts, guides.ts The quote contract, and one how-to guide per do-it-yourself part
 ```
 
 ## Design language

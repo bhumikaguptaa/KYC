@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, m, type Variants } from "motion/react";
 import { glide, spring } from "@/components/ui/MotionProvider";
 import { InstallHint } from "@/components/ui/InstallHint";
-import { IconArrow, IconCheck, IconWarning } from "@/components/ui/icons";
+import { IconArrow, IconCheck, IconReceipt, IconWarning } from "@/components/ui/icons";
 import { Lamp } from "@/components/ui/status";
 import { VinPlate, type PlateState } from "@/components/ui/VinPlate";
 import { DEMO_VIN } from "@/lib/car";
@@ -253,6 +254,24 @@ export default function StartPage() {
                   Change car
                 </button>
               </m.div>
+
+              <m.button
+                variants={rise}
+                onClick={() => {
+                  tick();
+                  router.push("/quote");
+                }}
+                className="group mt-2.5 flex w-full items-center gap-3.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3 text-left transition hover:bg-white/[0.07] active:scale-[0.99] sm:max-w-[27rem]"
+              >
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-caution/12 text-caution">
+                  <IconReceipt width={22} height={22} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">Check a repair quote</span>
+                  <span className="hidden text-[13px] leading-snug text-chalk/55 sm:block">Which prices look high, and what you could do yourself</span>
+                </span>
+                <IconArrow width={18} height={18} className="mr-1 shrink-0 text-chalk/50 transition-transform group-hover:translate-x-0.5" />
+              </m.button>
             </m.div>
           )}
         </AnimatePresence>
@@ -296,20 +315,27 @@ function RecallLine({ recalls, scope }: { recalls: Recall[]; scope: { filedUnder
 function WhereIsMyVin() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-5">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="-mx-1 flex min-h-11 items-center gap-2 px-1 text-sm text-chalk/60 transition hover:text-chalk"
-      >
-        <span
-          className={`grid size-5 place-items-center rounded-full border border-white/20 text-[11px] transition-transform ${open ? "rotate-45" : ""}`}
+    <div className="mt-4 sm:mt-5">
+      <div className="flex flex-wrap items-center gap-x-6">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="-mx-1 flex min-h-11 items-center gap-2 px-1 text-sm text-chalk/60 transition hover:text-chalk"
         >
-          +
-        </span>
-        Where do I find my VIN?
-      </button>
+          <span
+            className={`grid size-5 place-items-center rounded-full border border-white/20 text-[11px] transition-transform ${open ? "rotate-45" : ""}`}
+          >
+            +
+          </span>
+          Where do I find my VIN?
+        </button>
+        {/* A quote can be checked without a VIN: some people arrive holding one. */}
+        <Link href="/quote" className="-mx-1 flex min-h-11 items-center gap-2 px-1 text-sm text-chalk/60 transition hover:text-chalk">
+          <IconReceipt width={18} height={18} className="text-caution" />
+          Got a repair quote? <span className="text-beam">Check it</span>
+        </Link>
+      </div>
       <AnimatePresence initial={false}>
         {open && (
           <m.ol

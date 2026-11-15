@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, m, useDragControls, type PanInfo } from "motion/react";
+import { PartGuide } from "@/components/guide/PartGuide";
 import { glide, spring } from "@/components/ui/MotionProvider";
+import { ModeSwitch } from "@/components/ui/ModeSwitch";
 import {
   IconBack,
-  IconCar,
   IconClose,
   IconDoor,
   IconDrop,
@@ -22,43 +24,62 @@ import {
 } from "@/components/ui/icons";
 import { Effort, Lamp, STATUS, STATUS_ORDER } from "@/components/ui/status";
 import { PARTS, partById, type Part, type PartStatus } from "@/lib/car";
+import { GUIDES } from "@/lib/guides";
+import { isPartId } from "@/lib/quote";
 import { useScene } from "@/lib/scene-context";
 import { markSeen, seen, tick, useWide } from "@/lib/ui";
 
 /**
  * The garage keeps its view and selected part in the URL (/garage?view=bay&part=battery), so a
  * reload, a shared link or a relaunch of the installed app comes back to the same place.
+ * guide=1 opens the part's how-to guide on its sheet (the quote's "Show me how" links here).
  */
-type UrlState = { view: "garage" | "engineBay" | "part"; part: string | null };
+type UrlState = { view: "garage" | "engineBay" | "part"; part: string | null; guide: boolean };
 
 function readUrl(): UrlState {
   const q = new URLSearchParams(window.location.search);
   const part = partById(q.get("part"))?.id ?? null;
-  if (part) return { view: "part", part };
-  return { view: q.get("view") === "bay" ? "engineBay" : "garage", part: null };
+  if (part) return { view: "part", part, guide: q.get("guide") === "1" };
+  return { view: q.get("view") === "bay" ? "engineBay" : "garage", part: null, guide: false };
 }
+
+const hasGuide = (id: string | null | undefined) => isPartId(id) && !!GUIDES[id];
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export default function GaragePage() {
+  const router = useRouter();
   const s = useScene();
   const { setView, select, toggle, setXray } = s;
   const wide = useWide();
   const underHood = s.view === "engineBay" || s.view === "part" || s.view === "explore";
   const exploring = s.view === "explore";
   const part = partById(s.selected);
+  // The part sheet shows the how-to guide in place of the short text.
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guide = guideOpen && hasGuide(part?.id) && !exploring;
+
+  // On a phone the part sheet covers the lower half: lift the part above it (higher still for the
+  // taller guide), so you can see what you're reading about.
+  const { setFrameOffset } = s;
+  const lift = !wide && s.view === "part" ? (guide ? 0.42 : 0.3) : null;
+  useEffect(() => {
+    setFrameOffset(lift === null ? null : [0, lift]);
+  }, [lift, setFrameOffset]);
+  useEffect(() => () => setFrameOffset(null), [setFrameOffset]);
 
   // On arrival, restore the view from the URL. Read once: the ref survives React's dev double-run.
   const fromUrl = useRef<UrlState | null>(null);
   useEffect(() => {
     fromUrl.current ??= readUrl();
-    const { view, part: id } = fromUrl.current;
+    const { view, part: id, guide: withGuide } = fromUrl.current;
     if (view !== "garage") {
       setXray(false);
       toggle("hood", true);
     }
     select(id);
     setView(view);
+    setGuideOpen(withGuide);
   }, [setView, select, toggle, setXray]);
 
   // Afterwards, keep the URL in step with the view. replaceState, not push: no history pile-up.
@@ -67,9 +88,10 @@ export default function GaragePage() {
     const q = new URLSearchParams();
     if (s.view !== "garage") q.set("view", "bay");
     if ((s.view === "part" || s.view === "explore") && s.selected) q.set("part", s.selected);
+    if (s.view === "part" && guide) q.set("guide", "1");
     const url = q.size ? `/garage?${q}` : "/garage";
     if (url !== window.location.pathname + window.location.search) window.history.replaceState(null, "", url);
-  }, [s.view, s.selected]);
+  }, [s.view, s.selected, guide]);
 
   const goUnder = () => {
     s.setXray(false);
@@ -78,10 +100,12 @@ export default function GaragePage() {
     s.setView("engineBay");
   };
   const goOutside = () => {
+    setGuideOpen(false);
     s.select(null);
     s.setView("garage");
   };
   const closePart = () => {
+    setGuideOpen(false);
     s.select(null);
     s.setView("engineBay");
   };
@@ -92,6 +116,10 @@ export default function GaragePage() {
       part={part}
       exploring={exploring}
       mobile={!wide}
+      guide={guide}
+      onGuide={hasGuide(part.id) ? setGuideOpen : undefined}
+      // Came here from the quote: one tap back to the slip.
+      onBackToQuote={s.quote?.some((i) => i.relevantPart === part.id) ? () => router.push("/quote") : undefined}
       onClose={closePart}
       onExplore={() => {
         tick();
@@ -125,16 +153,17 @@ export default function GaragePage() {
           {!wide && sheet ? (
             sheet
           ) : underHood ? (
-            <PartsBrowser key="parts" exploring={exploring} />
+            <PartsBrowser key="parts" exploring={exploring} onPick={() => setGuideOpen(false)} />
           ) : (
             <Dock key="dock" />
           )}
         </AnimatePresence>
         <ModeSwitch
-          underHood={underHood}
-          onChange={(under) => {
-            tick();
-            if (under) goUnder();
+          place={underHood ? "bay" : "outside"}
+          quoteReady={s.quote !== null}
+          onChange={(p) => {
+            if (p === "quote") router.push("/quote");
+            else if (p === "bay") goUnder();
             else goOutside();
           }}
         />
@@ -188,38 +217,6 @@ function Header() {
         <span className="hidden sm:inline">Reset view</span>
       </button>
     </m.header>
-  );
-}
-
-/* ─────────────────────────── Mode switch ─────────────────────────── */
-
-/** The two places you can be: around the car, or in the engine bay. A sliding pill marks which. */
-function ModeSwitch({ underHood, onChange }: { underHood: boolean; onChange: (under: boolean) => void }) {
-  const modes: { under: boolean; label: string; Icon: Icon }[] = [
-    { under: false, label: "Outside", Icon: IconCar },
-    { under: true, label: "Under the hood", Icon: IconWrench },
-  ];
-  return (
-    <div role="tablist" aria-label="View" className="glass pointer-events-auto relative flex w-full max-w-[23rem] rounded-full p-1">
-      {modes.map(({ under, label, Icon }) => {
-        const active = under === underHood;
-        return (
-          <button
-            key={label}
-            role="tab"
-            aria-selected={active}
-            onClick={() => !active && onChange(under)}
-            className="relative flex min-h-12 flex-1 items-center justify-center rounded-full text-[15px] font-medium"
-          >
-            {active && <m.span layoutId="mode-pill" className="absolute inset-0 rounded-full bg-chalk" transition={spring} />}
-            <span className={`relative flex items-center gap-2 transition-colors duration-200 ${active ? "text-ink" : "text-chalk/65"}`}>
-              <Icon width={19} height={19} />
-              {label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -285,7 +282,7 @@ function Dock() {
  * Under the hood: a key that doubles as a filter ("what can I do myself?"), then the parts as
  * cards, easiest first. Tapping one flies the camera to it.
  */
-function PartsBrowser({ exploring }: { exploring: boolean }) {
+function PartsBrowser({ exploring, onPick }: { exploring: boolean; onPick: () => void }) {
   const s = useScene();
   const [filter, setFilter] = useState<PartStatus | null>(null);
   const counts = useMemo(
@@ -329,6 +326,7 @@ function PartsBrowser({ exploring }: { exploring: boolean }) {
               selected={s.selected === p.id}
               onClick={() => {
                 tick();
+                onPick();
                 s.select(p.id);
                 // While exploring, a card swaps which part is out (if that part can come out).
                 if (!exploring || !p.explorable) s.setView("part");
@@ -394,6 +392,9 @@ function PartSheet({
   part,
   exploring,
   mobile,
+  guide,
+  onGuide,
+  onBackToQuote,
   onClose,
   onExplore,
   onRecenter,
@@ -401,23 +402,36 @@ function PartSheet({
   part: Part;
   exploring: boolean;
   mobile: boolean;
+  /** showing the how-to guide instead of the short text */
+  guide: boolean;
+  /** present when this part has a guide */
+  onGuide?: (open: boolean) => void;
+  onBackToQuote?: () => void;
   onClose: () => void;
   onExplore: () => void;
   onRecenter: () => void;
 }) {
   const st = STATUS[part.status];
   const drag = useDragControls();
+  const body = useRef<HTMLDivElement>(null);
 
   // Phones: pull the sheet down to close it, like any native sheet.
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (info.offset.y > 90 || info.velocity.y > 600) onClose();
   };
 
+  // A guide is read top to bottom: start it at the top.
+  useEffect(() => {
+    body.current?.scrollTo({ top: 0 });
+  }, [guide]);
+
   return (
     <m.section
       aria-label={part.label}
       className={`glass pointer-events-auto relative flex flex-col overflow-hidden ${
-        mobile ? "max-h-[min(52vh,30rem)] w-full max-w-[34rem] rounded-[28px]" : "max-h-full w-[22rem] self-start rounded-[28px]"
+        mobile
+          ? `${guide ? "max-h-[min(66svh,42rem)]" : "max-h-[min(52vh,30rem)]"} w-full max-w-[34rem] rounded-[28px] transition-[max-height] duration-500`
+          : `max-h-full ${guide ? "w-[25rem]" : "w-[22rem]"} self-start rounded-[28px] transition-[width] duration-500`
       }`}
       initial={mobile ? { opacity: 0, y: 60 } : { opacity: 0, x: 40, scale: 0.98 }}
       animate={mobile ? { opacity: 1, y: 0 } : { opacity: 1, x: 0, scale: 1 }}
@@ -438,10 +452,22 @@ function PartSheet({
       <div className="relative touch-none px-5 pt-2.5" onPointerDown={(e) => mobile && drag.start(e)}>
         {mobile && <div aria-hidden className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/20" />}
         <div className="flex items-start justify-between gap-3 pt-1">
-          <span className={`mt-1 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${st.bg} ${st.text}`}>
-            <Lamp className={st.lamp} size={6} />
-            {st.label}
-          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {onBackToQuote && (
+              <button
+                onClick={onBackToQuote}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="-my-1 -ml-1 flex min-h-10 items-center gap-1.5 rounded-full bg-white/[0.07] pl-2 pr-3 text-xs font-medium text-chalk/80 transition active:scale-95"
+              >
+                <IconBack width={15} height={15} />
+                Your quote
+              </button>
+            )}
+            <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${st.bg} ${st.text}`}>
+              <Lamp className={st.lamp} size={6} />
+              {st.label}
+            </span>
+          </div>
           {/* The installed app has no browser back button, so every panel closes itself. */}
           <button
             onClick={onClose}
@@ -453,9 +479,44 @@ function PartSheet({
           </button>
         </div>
         <h2 className="mt-2 text-[22px] font-semibold leading-tight tracking-tight">{part.label}</h2>
+
+        {/* Parts with a how-to get two pages: what it is, and how to do the job. */}
+        {onGuide && !exploring && (
+          <div
+            role="tablist"
+            aria-label="Part details"
+            className="relative mt-3 flex rounded-full bg-white/[0.06] p-1"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {[
+              { on: false, label: "About" },
+              { on: true, label: "How to do it" },
+            ].map((t) => {
+              const active = t.on === guide;
+              return (
+                <button
+                  key={t.label}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    if (active) return;
+                    tick();
+                    onGuide(t.on);
+                  }}
+                  className="relative min-h-10 flex-1 rounded-full text-[14px] font-medium"
+                >
+                  {active && (
+                    <m.span layoutId={`sheet-tab-${part.id}`} className="absolute inset-0 rounded-full bg-white/[0.14]" transition={spring} />
+                  )}
+                  <span className={`relative transition-colors ${active ? "text-chalk" : "text-chalk/55"}`}>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
+      <div ref={body} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
         <AnimatePresence mode="wait" initial={false}>
           {exploring ? (
             <m.div key="facts" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={spring}>
@@ -478,9 +539,19 @@ function PartSheet({
                 </dl>
               )}
             </m.div>
+          ) : guide ? (
+            <m.div key="guide" className="pt-4" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }} transition={spring}>
+              <PartGuide partId={part.id} compact={mobile} />
+            </m.div>
           ) : (
-            <m.div key="about" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={spring}>
-              <p className="mt-1.5 text-[15px] leading-snug text-chalk/70">{part.about}</p>
+            <m.div
+              key="about"
+              initial={onGuide ? { opacity: 0, x: -16 } : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              exit={onGuide ? { opacity: 0, x: -16 } : { opacity: 0, y: -8 }}
+              transition={spring}
+            >
+              <p className={`${onGuide ? "mt-3" : "mt-1.5"} text-[15px] leading-snug text-chalk/70`}>{part.about}</p>
               <div className={`mt-4 rounded-2xl border-l-2 bg-white/[0.04] px-4 py-3 ${st.text} border-current`}>
                 <div className="gauge-label" style={{ color: "currentColor" }}>
                   Can I do it?
@@ -494,26 +565,42 @@ function PartSheet({
           )}
         </AnimatePresence>
 
-        <div className="mt-5 flex gap-2">
-          {part.explorable && (
-            <button
-              onClick={onExplore}
-              className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-chalk text-[15px] font-semibold text-ink transition active:scale-[0.98]"
-            >
-              {exploring ? <IconDrop width={19} height={19} /> : <IconLift width={19} height={19} />}
-              {exploring ? "Put it back" : "Take it out"}
-            </button>
-          )}
-          {exploring && (
-            <button
-              onClick={onRecenter}
-              aria-label="Recenter the part"
-              className="grid min-h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/[0.07] text-chalk/80 transition active:scale-95"
-            >
-              <IconRecenter width={19} height={19} />
-            </button>
-          )}
-        </div>
+        {!guide && (
+          <div className="mt-5 flex gap-2">
+            {onGuide && !exploring && (
+              <button
+                onClick={() => {
+                  tick();
+                  onGuide(true);
+                }}
+                className={`flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-[15px] font-semibold transition active:scale-[0.98] ${
+                  part.explorable ? "bg-white/[0.08] text-chalk" : "bg-chalk text-ink"
+                }`}
+              >
+                <IconWrench width={18} height={18} />
+                Show me how
+              </button>
+            )}
+            {part.explorable && (
+              <button
+                onClick={onExplore}
+                className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-chalk text-[15px] font-semibold text-ink transition active:scale-[0.98]"
+              >
+                {exploring ? <IconDrop width={19} height={19} /> : <IconLift width={19} height={19} />}
+                {exploring ? "Put it back" : "Take it out"}
+              </button>
+            )}
+            {exploring && (
+              <button
+                onClick={onRecenter}
+                aria-label="Recenter the part"
+                className="grid min-h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/[0.07] text-chalk/80 transition active:scale-95"
+              >
+                <IconRecenter width={19} height={19} />
+              </button>
+            )}
+          </div>
+        )}
         {exploring && (
           <p className="mt-3 text-center text-xs text-chalk/40">
             {mobile ? "One finger turns it · pinch to zoom" : "Drag to turn · scroll to zoom · right-drag to move"}

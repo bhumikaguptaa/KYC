@@ -25,6 +25,7 @@ import { createXrayMaterial } from "./xray-material";
 const GLOW_COLORS: Record<Glow, THREE.Color> = {
   select: new THREE.Color(TELLTALE.beam),
   diy: new THREE.Color(TELLTALE.go),
+  advanced: new THREE.Color(TELLTALE.caution),
   shop: new THREE.Color(TELLTALE.stop),
 };
 

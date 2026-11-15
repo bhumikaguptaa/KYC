@@ -25,6 +25,9 @@ export function Hotspots() {
   const outside = s.modelReady && s.view === "garage" && !s.xray;
   const bay = s.modelReady && (s.view === "engineBay" || s.view === "part");
   const panels = useRef(new Map<string, HTMLDivElement>());
+  // When a page lights parts up (a quote, a story chapter), the pins follow: only the lit parts,
+  // in their glow colour. Otherwise every part, in its status colour.
+  const lit = Object.keys(s.glows).length > 0;
 
   // Fade each panel label by how squarely its panel faces the camera.
   useFrame(({ camera }) => {
@@ -66,10 +69,11 @@ export function Hotspots() {
         ))}
 
       {bay &&
-        PARTS.map((p, i) => (
+        PARTS.filter((p) => !lit || s.glows[p.id]).map((p, i) => (
           <Html key={p.id} position={p.center} center zIndexRange={[16, 0]}>
             <PartPin
               part={p}
+              tone={PIN_COLOR[lit ? s.glows[p.id] : p.status]}
               selected={s.selected === p.id}
               dim={s.view === "part" && s.selected !== p.id}
               delay={i * 35}
@@ -103,16 +107,18 @@ function PanelLabel({ spot, open, delay, onPress }: { spot: PanelSpot; open: boo
   );
 }
 
-const PIN_COLOR = { diy: "text-go", advanced: "text-caution", shop: "text-stop" } as const;
+const PIN_COLOR = { diy: "text-go", advanced: "text-caution", shop: "text-stop", select: "text-beam" } as const;
 
 function PartPin({
   part,
+  tone,
   selected,
   dim,
   delay,
   onPress,
 }: {
   part: Part;
+  tone: string;
   selected: boolean;
   dim: boolean;
   delay: number;
@@ -122,7 +128,7 @@ function PartPin({
     <button
       onClick={onPress}
       aria-label={part.label}
-      className={`spot-in relative grid size-9 place-items-center transition-opacity duration-300 ${dim ? "opacity-45" : ""} ${PIN_COLOR[part.status]}`}
+      className={`spot-in relative grid size-9 place-items-center transition-opacity duration-300 ${dim ? "opacity-45" : ""} ${tone}`}
       style={{ animationDelay: `${delay}ms` }}
     >
       {selected && <span className="ping-ring absolute inset-2.5 rounded-full border-2 border-current" />}

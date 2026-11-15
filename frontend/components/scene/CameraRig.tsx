@@ -62,7 +62,7 @@ function viewOffset(view: string, aspect: number): [number, number] {
 /** One camera for the whole app. Views are poses; every change is an eased fly-to, never a cut. */
 export function CameraRig() {
   const ref = useRef<CameraControls>(null);
-  const { view, selected, recenterKey } = useScene();
+  const { view, selected, recenterKey, frameOffset } = useScene();
   const camera = useThree((st) => st.camera) as PerspectiveCamera;
   const aspect = useThree((st) => st.size.width / Math.max(1, st.size.height));
   const k = aspect < 0.9 ? PORTRAIT_PULLBACK : 1;
@@ -112,9 +112,9 @@ export function CameraRig() {
     // Make room for the page's own panel by sliding the picture, not the orbit: on the start
     // screen the text sits left on wide screens (car slides right) and at the bottom on phones
     // (car slides up). Everywhere else the car is centred.
-    const [ox, oy] = viewOffset(view, aspect);
+    const [ox, oy] = frameOffset ?? viewOffset(view, aspect);
     void c.setFocalOffset(ox, oy, 0, true);
-  }, [view, selected, camera, aspect, k, exploring, recenterKey]);
+  }, [view, selected, camera, aspect, k, exploring, recenterKey, frameOffset]);
 
   // Slow turntable on the start screen, and around a taken-out part, until the user moves the camera.
   useFrame((_, dt) => {

@@ -176,3 +176,36 @@ export const IconDownload = (p: P) => (
     <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
   </Svg>
 );
+
+/** A shop's repair order: a slip with a torn bottom edge and printed lines. */
+export const IconReceipt = (p: P) => (
+  <Svg {...p}>
+    <path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4zM9 8h6M9 11.5h6M9 15h3.5" />
+  </Svg>
+);
+
+export const IconUpload = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9M5 19.5h14" />
+  </Svg>
+);
+
+export const IconPlay = (p: P) => (
+  <Svg {...p}>
+    <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconClock = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Svg>
+);
+
+/** An open-end wrench, for the "you need" tool list. */
+export const IconSpanner = (p: P) => (
+  <Svg {...p}>
+    <path d="M14.5 4.2a4.5 4.5 0 0 0-4.8 6L4 15.9a1.8 1.8 0 0 0 2.6 2.6l5.7-5.7a4.5 4.5 0 0 0 6-4.8l-2.6 2.6-2.4-.6-.6-2.4z" />
+  </Svg>
+);
