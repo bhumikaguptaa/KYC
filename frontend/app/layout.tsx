@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { SceneMount } from "@/components/scene/SceneMount";
 import { SerwistProvider } from "@serwist/next/react";
 import { LoadingVeil } from "@/components/ui/LoadingVeil";
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </MotionProvider>
         </SceneProvider>
         </SerwistProvider>
+        <Analytics />
       </body>
     </html>
   );
