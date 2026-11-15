@@ -8,6 +8,7 @@ import { PartGuide } from "@/components/guide/PartGuide";
 import { glide, spring } from "@/components/ui/MotionProvider";
 import { ModeSwitch } from "@/components/ui/ModeSwitch";
 import {
+  IconArrow,
   IconBack,
   IconClose,
   IconDoor,
@@ -16,6 +17,7 @@ import {
   IconHood,
   IconLift,
   IconLights,
+  IconReceipt,
   IconRecenter,
   IconWarning,
   IconWipers,
@@ -93,6 +95,13 @@ export default function GaragePage() {
     if (url !== window.location.pathname + window.location.search) window.history.replaceState(null, "", url);
   }, [s.view, s.selected, guide]);
 
+  // No quote yet: the quote page plays a sample upload (?try=1), so the feature shows itself in one tap.
+  const quotePath = s.quote === null ? "/quote?try=1" : "/quote";
+  const tryQuote = () => {
+    tick();
+    router.push(quotePath);
+  };
+
   const goUnder = () => {
     s.setXray(false);
     s.toggle("hood", true);
@@ -155,14 +164,17 @@ export default function GaragePage() {
           ) : underHood ? (
             <PartsBrowser key="parts" exploring={exploring} onPick={() => setGuideOpen(false)} />
           ) : (
-            <Dock key="dock" />
+            <m.div key="dock" className="flex w-full flex-col items-center gap-3" exit={{ opacity: 0 }}>
+              {s.quote === null && <TryQuote onClick={tryQuote} />}
+              <Dock />
+            </m.div>
           )}
         </AnimatePresence>
         <ModeSwitch
           place={underHood ? "bay" : "outside"}
           quoteReady={s.quote !== null}
           onChange={(p) => {
-            if (p === "quote") router.push("/quote");
+            if (p === "quote") router.push(quotePath);
             else if (p === "bay") goUnder();
             else goOutside();
           }}
@@ -217,6 +229,27 @@ function Header() {
         <span className="hidden sm:inline">Reset view</span>
       </button>
     </m.header>
+  );
+}
+
+/* ───────────────────────────── Try a quote ───────────────────────────── */
+
+/** The way into the second feature, right above the car controls, until a quote has been seen. */
+function TryQuote({ onClick }: { onClick: () => void }) {
+  return (
+    <m.button
+      onClick={onClick}
+      className="glass group pointer-events-auto flex min-h-11 items-center gap-2.5 rounded-full py-1.5 pl-2 pr-4 text-[14px] font-medium text-chalk/90 transition active:scale-95"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...spring, delay: 0.35 }}
+    >
+      <span className="grid size-8 place-items-center rounded-full bg-caution/15 text-caution">
+        <IconReceipt width={17} height={17} />
+      </span>
+      Try our quote feature
+      <IconArrow width={16} height={16} className="text-chalk/50 transition-transform group-hover:translate-x-0.5" />
+    </m.button>
   );
 }
 

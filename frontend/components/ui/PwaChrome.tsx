@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSerwist } from "@serwist/next/react";
 import { AnimatePresence, m } from "motion/react";
 import { isStandalone, useOnline } from "@/lib/pwa";
+import { useScene } from "@/lib/scene-context";
 import { spring } from "./MotionProvider";
 import { Lamp } from "./status";
 
@@ -12,10 +13,30 @@ import { Lamp } from "./status";
  * offline notice, asking the browser to keep our offline data, and blocking page zoom gestures.
  * Both notices are tell-tales: blue for "something new is ready", amber for "running limited".
  */
+/** A Serwist instance can only be registered once (the car can reload after a lost GL context). */
+let registered = false;
+
 export function PwaChrome() {
   const { serwist } = useSerwist();
   const online = useOnline();
   const [updateReady, setUpdateReady] = useState(false);
+  const { modelReady } = useScene();
+
+  // Register the service worker only once the car is on screen. On a first visit it downloads the
+  // whole offline copy (about 5 MB, see serwist.config.mjs); starting that at once would compete
+  // with the page for a phone's bandwidth and delay the car. The timer covers a model that never loads.
+  useEffect(() => {
+    if (!serwist) return;
+    if (registered) return;
+    const t = setTimeout(
+      () => {
+        registered = true;
+        void serwist.register().catch(() => {});
+      },
+      modelReady ? 1500 : 20000,
+    );
+    return () => clearTimeout(t);
+  }, [serwist, modelReady]);
 
   // Update flow: a new version downloads in the background and waits. We offer a reload; if the
   // user ignores it, the new version takes over the next time the app is opened from scratch.

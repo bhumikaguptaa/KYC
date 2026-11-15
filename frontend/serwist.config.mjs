@@ -12,4 +12,13 @@ export default serwist({
   maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
   // iOS reads launch images itself before the app runs; no need to store them twice.
   globIgnores: ["public/splash/**"],
+  // Models are versioned by filename (civic.v1.glb). Without a revision, precaching fetches the model
+  // normally, so it comes from the browser cache the page just filled instead of a second 3 MB
+  // download (a revision makes Serwist bypass that cache).
+  manifestTransforms: [
+    async (entries) => ({
+      manifest: entries.map((e) => (/\/models\/[^/]+\.glb$/.test(e.url) ? { ...e, revision: null } : e)),
+      warnings: [],
+    }),
+  ],
 });

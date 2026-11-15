@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, m } from "motion/react";
@@ -20,6 +20,9 @@ import { tick, useWide } from "@/lib/ui";
  * Once it's read, the hood opens, every quoted part lights up in its verdict's colour and the
  * quote comes back as a marked-up paper slip. Tapping a line flies to its part.
  */
+/** Long enough to see the scan, short enough that nobody wonders whether it froze. */
+const SIMULATED_READ_MS = 1800;
+
 export default function QuotePage() {
   const router = useRouter();
   const wide = useWide();
@@ -62,6 +65,37 @@ export default function QuotePage() {
   };
   const vehicleLine = v ? `${v.year} ${v.make} ${v.model}` : null;
   const picked = hasQuote && !!s.selected;
+
+  // A sample upload for people with no PDF: the real "Reading your quote" scan, then the sample
+  // quote. The PDF reader is sample data for now anyway (lib/quote-client.ts).
+  const [simulating, setSimulating] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const trySample = useCallback(() => {
+    tick();
+    setSimulating(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      setQuote(QUOTE_FIXTURE);
+      setSimulating(false);
+    }, SIMULATED_READ_MS);
+  }, [setQuote]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // /quote?try=1 (the demo's "Try our quote feature"): play it on arrival, just after the panel
+  // slides in. The parameter is dropped at once, so a reload or Back doesn't play it again.
+  // Read once into a ref: it survives React's dev double-run of effects, the URL does not.
+  const wantsTry = useRef<boolean | null>(null);
+  useEffect(() => {
+    wantsTry.current ??= new URLSearchParams(window.location.search).get("try") === "1";
+    if (!wantsTry.current) return;
+    if (window.location.search) window.history.replaceState(null, "", "/quote");
+    if (hasQuote) return;
+    const t = setTimeout(() => {
+      wantsTry.current = false;
+      trySample();
+    }, 350);
+    return () => clearTimeout(t);
+  }, [hasQuote, trySample]);
 
   return (
     <div className="relative flex h-full flex-col">
@@ -118,14 +152,12 @@ export default function QuotePage() {
                 could do yourself, right on your car.
               </p>
               <div className="mt-5">
-                <QuoteUpload />
+                <QuoteUpload simulating={simulating ? "sample-shop-quote.pdf" : null} />
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 text-[15px] text-chalk/70">
                 <button
-                  onClick={() => {
-                    tick();
-                    setQuote(QUOTE_FIXTURE);
-                  }}
+                  onClick={trySample}
+                  disabled={simulating}
                   className="-my-1 min-h-11 text-left"
                 >
                   No quote handy? <span className="text-beam">Try a sample quote</span>

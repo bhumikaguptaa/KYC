@@ -20,7 +20,7 @@ const serwist = new Serwist({
   precacheOptions: {
     cleanupOutdatedCaches: true,
     // /garage?view=bay&part=battery&guide=1 must still match the precached /garage page.
-    ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^view$/, /^part$/, /^guide$/],
+    ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^view$/, /^part$/, /^guide$/, /^try$/],
   },
   // A new version waits until the user taps "Reload" (see PwaChrome) or closes the app.
   skipWaiting: false,

@@ -9,7 +9,7 @@ import { InstallHint } from "@/components/ui/InstallHint";
 import { IconArrow, IconCheck, IconReceipt, IconWarning } from "@/components/ui/icons";
 import { Lamp } from "@/components/ui/status";
 import { VinPlate, type PlateState } from "@/components/ui/VinPlate";
-import { DEMO_VIN } from "@/lib/car";
+import { DEMO_RECALLS, DEMO_VEHICLE } from "@/lib/demo";
 import { useScene, type Recall, type Vehicle } from "@/lib/scene-context";
 import { tick } from "@/lib/ui";
 
@@ -34,6 +34,9 @@ export default function StartPage() {
   const [vin, setVin] = useState("");
   const [plate, setPlate] = useState<PlateState>("idle");
   const [error, setError] = useState<string | null>(null);
+  // The demo car is the main way in (people arrive from a QR code with no VIN to hand); typing a
+  // VIN is one tap further.
+  const [vinOpen, setVinOpen] = useState(false);
   const busy = plate === "busy";
 
   // Start screen pose: everything closed, slow turntable.
@@ -80,12 +83,21 @@ export default function StartPage() {
     }
   }
 
+  // The demo car is decoded ahead of time (lib/demo.ts): instant, offline-proof, no NHTSA call.
+  function tryDemo() {
+    tick(12);
+    setError(null);
+    setVehicle(DEMO_VEHICLE);
+    setRecalls(DEMO_RECALLS.recalls, { filedUnder: DEMO_RECALLS.filedUnder, exact: DEMO_RECALLS.exact });
+  }
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (vin.length === 17 && !busy) void decode(vin);
   };
 
   const v = s.vehicle;
+  const isDemo = v?.vin === DEMO_VEHICLE.vin;
   const left = 17 - vin.length;
 
   return (
@@ -125,52 +137,72 @@ export default function StartPage() {
                 you can safely fix yourself.
               </m.p>
 
-              <m.form variants={rise} onSubmit={onSubmit} className="mt-5 sm:mt-7">
-                <VinPlate
-                  value={vin}
-                  onChange={(x) => {
-                    setVin(x);
-                    if (plate === "error") setPlate("idle");
-                    setError(null);
-                  }}
-                  state={plate}
-                />
+              <m.div variants={rise} className="mt-5 sm:mt-7">
+                <button
+                  type="button"
+                  onClick={tryDemo}
+                  className="group flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-chalk px-6 text-base font-semibold text-ink transition active:scale-[0.98] sm:w-auto sm:min-w-[16rem]"
+                >
+                  Try the demo car
+                  <IconArrow width={19} height={19} className="transition-transform group-hover:translate-x-0.5" />
+                </button>
+                <p className="mt-2 text-[13px] text-chalk/45">A 2018 Honda Civic Type R. No VIN needed.</p>
+              </m.div>
 
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                  <button
-                    type="submit"
-                    disabled={busy || left !== 0}
-                    className="group relative flex min-h-13 items-center justify-center gap-2 overflow-hidden rounded-2xl bg-chalk px-6 text-[15px] font-semibold text-ink transition active:scale-[0.98] disabled:bg-white/[0.07] disabled:text-chalk/45 sm:min-w-[13rem]"
-                  >
-                    {busy ? (
-                      "Reading your VIN…"
-                    ) : left === 0 ? (
-                      <>
-                        Show my car
-                        <IconArrow width={18} height={18} className="transition-transform group-active:translate-x-0.5" />
-                      </>
-                    ) : vin.length === 0 ? (
-                      "Show my car"
-                    ) : (
-                      <span className="tabular-nums">
-                        {left} more character{left === 1 ? "" : "s"}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Fill the field first, so the demo VIN shows even when the lookup cannot run (offline).
-                      setVin(DEMO_VIN.pattern);
-                      void decode(DEMO_VIN.pattern, DEMO_VIN.year);
-                    }}
-                    disabled={busy}
-                    className="min-h-11 whitespace-nowrap rounded-2xl px-4 text-[15px] text-chalk/70 transition hover:text-chalk active:scale-[0.98] disabled:opacity-40"
-                  >
-                    No VIN handy? <span className="text-beam">Try a demo car</span>
-                  </button>
-                </div>
-              </m.form>
+              <m.div variants={rise}>
+                <AnimatePresence initial={false} mode="wait">
+                  {!vinOpen ? (
+                    <m.button
+                      key="ask"
+                      type="button"
+                      onClick={() => setVinOpen(true)}
+                      className="-mx-1 mt-3 min-h-11 px-1 text-[15px] text-chalk/70 transition hover:text-chalk"
+                      exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    >
+                      Have your VIN? <span className="text-beam">Enter it</span>
+                    </m.button>
+                  ) : (
+                    <m.form
+                      key="vin"
+                      onSubmit={onSubmit}
+                      className="mt-5"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={glide}
+                    >
+                      <VinPlate
+                        value={vin}
+                        onChange={(x) => {
+                          setVin(x);
+                          if (plate === "error") setPlate("idle");
+                          setError(null);
+                        }}
+                        state={plate}
+                      />
+                      <button
+                        type="submit"
+                        disabled={busy || left !== 0}
+                        className="group mt-3 flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.1] px-6 text-[15px] font-semibold text-chalk transition active:scale-[0.98] disabled:bg-white/[0.05] disabled:text-chalk/45 sm:w-auto sm:min-w-[13rem]"
+                      >
+                        {busy ? (
+                          "Reading your VIN…"
+                        ) : left === 0 ? (
+                          <>
+                            Show my car
+                            <IconArrow width={18} height={18} className="transition-transform group-active:translate-x-0.5" />
+                          </>
+                        ) : vin.length === 0 ? (
+                          "Show my car"
+                        ) : (
+                          <span className="tabular-nums">
+                            {left} more character{left === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </button>
+                    </m.form>
+                  )}
+                </AnimatePresence>
+              </m.div>
 
               <AnimatePresence>
                 {error && (
@@ -188,7 +220,7 @@ export default function StartPage() {
               </AnimatePresence>
 
               <m.div variants={rise}>
-                <WhereIsMyVin />
+                <WhereIsMyVin showVinHelp={vinOpen} />
                 <InstallHint />
               </m.div>
             </m.div>
@@ -259,7 +291,7 @@ export default function StartPage() {
                 variants={rise}
                 onClick={() => {
                   tick();
-                  router.push("/quote");
+                  router.push(isDemo ? "/quote?try=1" : "/quote");
                 }}
                 className="group mt-2.5 flex w-full items-center gap-3.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3 text-left transition hover:bg-white/[0.07] active:scale-[0.99] sm:max-w-[27rem]"
               >
@@ -267,8 +299,10 @@ export default function StartPage() {
                   <IconReceipt width={22} height={22} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold">Check a repair quote</span>
-                  <span className="hidden text-[13px] leading-snug text-chalk/55 sm:block">Which prices look high, and what you could do yourself</span>
+                  <span className="block text-[15px] font-semibold">{isDemo ? "Try our quote feature" : "Check a repair quote"}</span>
+                  <span className="hidden text-[13px] leading-snug text-chalk/55 sm:block">
+                    {isDemo ? "See a sample shop quote checked line by line" : "Which prices look high, and what you could do yourself"}
+                  </span>
                 </span>
                 <IconArrow width={18} height={18} className="mr-1 shrink-0 text-chalk/50 transition-transform group-hover:translate-x-0.5" />
               </m.button>
@@ -312,11 +346,12 @@ function RecallLine({ recalls, scope }: { recalls: Recall[]; scope: { filedUnder
 }
 
 /** Older drivers often don't know where the VIN lives; three places, in plain words. */
-function WhereIsMyVin() {
+function WhereIsMyVin({ showVinHelp }: { showVinHelp: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-4 sm:mt-5">
+    <div className="mt-2 sm:mt-3">
       <div className="flex flex-wrap items-center gap-x-6">
+        {showVinHelp && (
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -330,6 +365,7 @@ function WhereIsMyVin() {
           </span>
           Where do I find my VIN?
         </button>
+        )}
         {/* A quote can be checked without a VIN: some people arrive holding one. */}
         <Link href="/quote" className="-mx-1 flex min-h-11 items-center gap-2 px-1 text-sm text-chalk/60 transition hover:text-chalk">
           <IconReceipt width={18} height={18} className="text-caution" />
@@ -337,7 +373,7 @@ function WhereIsMyVin() {
         </Link>
       </div>
       <AnimatePresence initial={false}>
-        {open && (
+        {open && showVinHelp && (
           <m.ol
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}

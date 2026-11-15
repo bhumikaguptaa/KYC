@@ -12,8 +12,10 @@ import { tick } from "@/lib/ui";
  * For now the PDF is not read: any PDF shows one of five sample quotes (see lib/quote-client.ts).
  * On success the lines land in the scene state (`quote`), where the quote page picks them up.
  * `compact` is the one-button "Upload a different quote" form shown under a quote.
+ * `simulating`: a sample upload is playing (see the quote page), so show the same scan a real
+ * upload shows, for this made-up file name.
  */
-export function QuoteUpload({ compact = false }: { compact?: boolean }) {
+export function QuoteUpload({ compact = false, simulating = null }: { compact?: boolean; simulating?: string | null }) {
   const { setQuote } = useScene();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -107,8 +109,8 @@ export function QuoteUpload({ compact = false }: { compact?: boolean }) {
       {fileInput}
       {/* The slot the paper goes into. Tap it, or drop a PDF on it. */}
       <div {...dropProps}>
-        {busy ? (
-          <Reading fileName={fileName} />
+        {busy || simulating ? (
+          <Reading fileName={simulating ?? fileName} />
         ) : (
           <button
             type="button"
