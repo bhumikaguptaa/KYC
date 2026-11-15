@@ -209,3 +209,11 @@ export const IconSpanner = (p: P) => (
     <path d="M14.5 4.2a4.5 4.5 0 0 0-4.8 6L4 15.9a1.8 1.8 0 0 0 2.6 2.6l5.7-5.7a4.5 4.5 0 0 0 6-4.8l-2.6 2.6-2.4-.6-.6-2.4z" />
   </Svg>
 );
+
+/** Map pin: a place you can go to. */
+export const IconPin = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 21s-6.5-5.7-6.5-10.6a6.5 6.5 0 0 1 13 0C18.5 15.3 12 21 12 21Z" />
+    <circle cx="12" cy="10.4" r="2.3" />
+  </Svg>
+);

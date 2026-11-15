@@ -7,6 +7,7 @@ import { spring } from "@/components/ui/MotionProvider";
 import { GUIDES } from "@/lib/guides";
 import { isPartId } from "@/lib/quote";
 import { tick } from "@/lib/ui";
+import { ToolList } from "./ToolList";
 import { VideoEmbed } from "./VideoEmbed";
 
 /**
@@ -56,14 +57,7 @@ export function PartGuide({ partId, compact = false }: { partId: string; compact
           <IconSpanner width={14} height={14} />
           You need
         </div>
-        <ul className="mt-1.5 space-y-1 text-[14px] leading-snug text-chalk/85">
-          {guide.tools.map((t) => (
-            <li key={t} className="flex gap-2">
-              <span aria-hidden className="mt-[0.55em] size-1 shrink-0 rounded-full bg-chalk/40" />
-              {t}
-            </li>
-          ))}
-        </ul>
+        <ToolList tools={guide.tools} />
       </div>
 
       <ol className="relative mt-4" aria-label="Steps">
