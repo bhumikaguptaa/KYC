@@ -1,5 +1,5 @@
-// The contract between the two halves of the quote pipeline (see quote-pipeline-plan.md).
-// The API route (POST /api/quote) produces these shapes; the quote UI consumes them.
+// The shape of a quote (see quote-pipeline-plan.md). The quote UI consumes these shapes.
+// For now quotes come from lib/sample-quotes.ts, not from a PDF read by Claude.
 // Pure data and types: safe to import from both server and client code.
 import { PARTS } from "./car";
 
@@ -34,16 +34,18 @@ export type QuoteItem = {
   description: string;
   /** price of this line in whole US dollars */
   amount: number;
-  /** only ever true when relevantPart is a part with status "diy" (the server enforces this) */
+  /** only ever true when relevantPart is a part with status "diy" */
   canDIY: boolean;
+  /** the price is above the average for this job; shown as the orange "Above average" pill */
   isHighPrice: boolean;
   /** null when the line matches no part in the app, for example a tire rotation */
   relevantPart: PartId | null;
 };
 
 /**
- * Body of POST /api/quote. Success is status 200 with `items` (possibly empty: no repair lines
- * found). Failure is a 4xx/5xx status with `error`, a sentence the UI can show as it is.
+ * Body of a quote-reading API response, for when a server route reads real PDFs again. Success is
+ * status 200 with `items` (possibly empty: no repair lines found). Failure is a 4xx/5xx status
+ * with `error`, a sentence the UI can show as it is.
  */
 export type QuoteResponse = { items: QuoteItem[] } | { error: string };
 

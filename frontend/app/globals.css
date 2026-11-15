@@ -6,6 +6,10 @@
   --color-diy: #34d399;
   --color-shop: #f87171;
   --color-advanced: #fbbf24;
+  /* quote status "Careful": a job that needs care, between do-it-yourself green and mechanic red */
+  --color-careful: #fb923c;
+  /* a price above the average. Yellow, so it never reads as one of the three status colors */
+  --color-pricey: #facc15;
 }
 
 html,

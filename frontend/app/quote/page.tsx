@@ -43,7 +43,8 @@ export default function QuotePage() {
   return (
     <div className="flex h-full flex-col justify-end p-4 sm:justify-start sm:p-6">
       <m.section
-        className="glass pointer-events-auto flex max-h-[78%] w-full flex-col rounded-3xl sm:max-h-full sm:w-[26rem]"
+        // More opaque than the other panels: the list is dense text, and the car behind it made it hard to read.
+        className="glass pointer-events-auto flex max-h-[78%] w-full flex-col rounded-3xl bg-[rgb(20_20_23/0.94)] sm:max-h-full sm:w-[26rem]"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={spring}
@@ -63,13 +64,13 @@ export default function QuotePage() {
         <div className="min-h-0 overflow-y-auto overscroll-contain px-5 pt-2 pb-5">
           <h1 className="text-2xl font-semibold tracking-tight">Your repair quote</h1>
           <p className="mt-1 text-sm text-white/55">
-            See what each line costs, which prices look high, and what you could do yourself.
+            See what each line costs, which prices are above average, and what you could do yourself.
           </p>
 
           <div className="mt-4">
             <QuoteUpload />
           </div>
-          {/* A made-up quote: shows how the app works without a PDF, a password or API credit. */}
+          {/* A made-up quote: shows how the app works without picking a PDF. */}
           <div className="mt-1 flex items-center gap-3 text-xs text-white/40">
             <button onClick={() => setQuote(QUOTE_FIXTURE)} className="-my-2 min-h-11 text-accent">
               Try a sample quote
