@@ -50,10 +50,19 @@ function explorePose(fovDeg: number, aspect: number): { position: Vec3; target: 
   };
 }
 
+/** Sideways/upward shift of the picture (camera-space metres) so the car clears the page's panels. */
+function viewOffset(view: string, aspect: number): [number, number] {
+  const portrait = aspect < 0.9;
+  if (view === "start") return aspect > 1.1 ? [-Math.min(2.4, 1.3 * aspect), 0] : [0, 1.9];
+  // Phones: the dock and mode switch take the bottom of the screen, so lift the car a little.
+  if (view === "garage" && portrait) return [0, 0.12];
+  return [0, 0];
+}
+
 /** One camera for the whole app. Views are poses; every change is an eased fly-to, never a cut. */
 export function CameraRig() {
   const ref = useRef<CameraControls>(null);
-  const { view, selected, recenterKey } = useScene();
+  const { view, selected, recenterKey, frameOffset } = useScene();
   const camera = useThree((st) => st.camera) as PerspectiveCamera;
   const aspect = useThree((st) => st.size.width / Math.max(1, st.size.height));
   const k = aspect < 0.9 ? PORTRAIT_PULLBACK : 1;
@@ -94,8 +103,18 @@ export function CameraRig() {
     if (exploring) {
       const e = explorePose(camera.fov, aspect);
       void c.setLookAt(...e.position, ...e.target, true);
-    } else void c.setLookAt(...pullBack(pos, target, k), ...target, true);
-  }, [view, selected, camera, aspect, k, exploring, recenterKey]);
+    } else {
+      // On a phone the start screen and the garage share the screen with their panels: back off
+      // further so the whole car fits in the space left for it.
+      const kk = aspect >= 0.9 ? k : view === "start" ? k * 1.5 : view === "garage" ? k * 1.7 : k;
+      void c.setLookAt(...pullBack(pos, target, kk), ...target, true);
+    }
+    // Make room for the page's own panel by sliding the picture, not the orbit: on the start
+    // screen the text sits left on wide screens (car slides right) and at the bottom on phones
+    // (car slides up). Everywhere else the car is centred.
+    const [ox, oy] = frameOffset ?? viewOffset(view, aspect);
+    void c.setFocalOffset(ox, oy, 0, true);
+  }, [view, selected, camera, aspect, k, exploring, recenterKey, frameOffset]);
 
   // Slow turntable on the start screen, and around a taken-out part, until the user moves the camera.
   useFrame((_, dt) => {
@@ -120,7 +139,7 @@ export function CameraRig() {
       boundaryFriction={0.25}
       // The part is about EXPLORE.size across, so 0.5 stops just short of its surface.
       minDistance={exploring ? 0.5 : 0.9}
-      maxDistance={exploring ? 3.5 : 11 * k}
+      maxDistance={exploring ? 3.5 : 14 * k}
       minPolarAngle={exploring ? 0.05 : 0.15}
       maxPolarAngle={exploring ? Math.PI * 0.8 : Math.PI * 0.47}
     />

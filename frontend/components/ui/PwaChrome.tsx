@@ -5,10 +5,12 @@ import { useSerwist } from "@serwist/next/react";
 import { AnimatePresence, m } from "motion/react";
 import { isStandalone, useOnline } from "@/lib/pwa";
 import { spring } from "./MotionProvider";
+import { Lamp } from "./status";
 
 /**
  * App-level PWA behaviour that has no page of its own: the "update available" prompt, the
  * offline notice, asking the browser to keep our offline data, and blocking page zoom gestures.
+ * Both notices are tell-tales: blue for "something new is ready", amber for "running limited".
  */
 export function PwaChrome() {
   const { serwist } = useSerwist();
@@ -48,37 +50,39 @@ export function PwaChrome() {
   };
 
   return (
-    <div className="safe-area pointer-events-none fixed inset-x-0 top-0 z-30 flex justify-center">
+    <div className="safe-area pointer-events-none fixed inset-x-0 top-0 z-30 flex justify-center px-4">
       <AnimatePresence>
         {updateReady ? (
           <m.div
             key="update"
             role="status"
             className="glass pointer-events-auto mt-3 flex items-center gap-3 rounded-full py-1.5 pl-4 pr-1.5 text-sm"
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
+            initial={{ opacity: 0, y: -16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -16, scale: 0.96 }}
             transition={spring}
           >
-            Update available
+            <Lamp className="text-beam" size={7} />
+            A new version is ready
             <button
               onClick={reload}
-              className="min-h-9 rounded-full bg-white px-4 text-sm font-medium text-black transition active:scale-95"
+              className="min-h-9 rounded-full bg-chalk px-4 text-sm font-semibold text-ink transition active:scale-95"
             >
-              Reload
+              Update
             </button>
           </m.div>
         ) : !online ? (
           <m.div
             key="offline"
             role="status"
-            className="glass mt-3 rounded-full px-4 py-2 text-xs text-white/75"
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
+            className="glass mt-3 flex items-center gap-2.5 rounded-full px-4 py-2 text-[13px] text-chalk/80"
+            initial={{ opacity: 0, y: -16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -16, scale: 0.96 }}
             transition={spring}
           >
-            You&apos;re offline. The car still works; VIN and recall lookups need a connection.
+            <Lamp className="text-caution" size={7} />
+            Offline. Your car still works; VIN and recall lookups need a connection.
           </m.div>
         ) : null}
       </AnimatePresence>

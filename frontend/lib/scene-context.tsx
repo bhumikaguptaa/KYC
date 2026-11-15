@@ -10,7 +10,7 @@ import type { QuoteItem } from "./quote";
  */
 export type View = "start" | "garage" | "engineBay" | "part" | "explore";
 /** How a part glows: the user's selection, or a slip result. */
-export type Glow = "select" | "diy" | "shop";
+export type Glow = "select" | "diy" | "advanced" | "shop";
 
 export type Vehicle = {
   vin: string;
@@ -55,6 +55,12 @@ type SceneState = {
   /** bumped to fly the camera back to the current view's framing */
   recenterKey: number;
   recenter: () => void;
+  /**
+   * A page can slide the picture to make room for its own panels (camera-space metres, x then y).
+   * null = the view's default framing.
+   */
+  frameOffset: [number, number] | null;
+  setFrameOffset: (o: [number, number] | null) => void;
   recalls: Recall[];
   /** what NHTSA filed the recalls under, and whether that is this exact model or its family */
   recallScope: { filedUnder: string; exact: boolean } | null;
@@ -82,6 +88,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const [modelReady, setModelReady] = useState(false);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [recenterKey, setRecenterKey] = useState(0);
+  const [frameOffset, setFrameOffset] = useState<[number, number] | null>(null);
   const recenter = useCallback(() => setRecenterKey((k) => k + 1), []);
   const [recalls, setRecallList] = useState<Recall[]>([]);
   const [recallScope, setRecallScope] = useState<SceneState["recallScope"]>(null);
@@ -119,13 +126,15 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       setVehicle,
       recenterKey,
       recenter,
+      frameOffset,
+      setFrameOffset,
       recalls,
       recallScope,
       setRecalls,
       quote,
       setQuote,
     }),
-    [view, open, toggle, lights, wipers, xray, selected, glows, modelReady, vehicle, recenterKey, recenter, recalls, recallScope, setRecalls, quote],
+    [view, open, toggle, lights, wipers, xray, selected, glows, modelReady, vehicle, recenterKey, recenter, frameOffset, recalls, recallScope, setRecalls, quote],
   );
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;

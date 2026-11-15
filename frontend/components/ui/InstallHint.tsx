@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useInstallPrompt, useIsIos, useStandalone } from "@/lib/pwa";
+import { IconClose, IconDownload } from "./icons";
 
 const KEY = "kyc:install-dismissed";
 const wasDismissed = () => {
@@ -32,19 +33,27 @@ export function InstallHint() {
   };
 
   return (
-    <div className="mt-4 flex items-center gap-2 border-t border-white/10 pt-3 text-xs text-white/55">
+    <div className="mt-4 flex items-center gap-3 border-t border-white/[0.08] pt-3 text-sm text-chalk/60">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-chalk/80">
+        <IconDownload width={18} height={18} />
+      </span>
       {install ? (
-        <button onClick={() => void install()} className="min-h-11 flex-1 text-left text-accent">
-          Install KYC as an app
+        <button onClick={() => void install()} className="min-h-11 flex-1 text-left">
+          <span className="text-chalk">Put KYC on your home screen</span>
+          <span className="block text-xs text-chalk/50">Works offline, opens full screen</span>
         </button>
       ) : (
-        <p className="flex-1">
-          Install: tap <span className="text-white/85">Share</span>, then{" "}
-          <span className="text-white/85">Add to Home Screen</span>.
+        <p className="flex-1 leading-snug">
+          Add KYC to your home screen: tap <span className="text-chalk">Share</span>, then{" "}
+          <span className="text-chalk">Add to Home Screen</span>.
         </p>
       )}
-      <button onClick={dismiss} aria-label="Dismiss install hint" className="-mr-2 grid size-11 place-items-center text-base text-white/40">
-        ✕
+      <button
+        onClick={dismiss}
+        aria-label="Dismiss install hint"
+        className="-mr-2 grid size-11 shrink-0 place-items-center text-chalk/40 transition hover:text-chalk"
+      >
+        <IconClose width={18} height={18} />
       </button>
     </div>
   );

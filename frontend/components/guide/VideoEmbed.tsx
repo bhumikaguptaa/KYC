@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconPlay } from "@/components/ui/icons";
 import { useOnline } from "@/lib/pwa";
 
 /**
@@ -13,7 +14,7 @@ export function VideoEmbed({ id, title }: { id: string; title: string }) {
 
   if (!online && !playing) {
     return (
-      <div className="grid aspect-video w-full place-items-center rounded-2xl bg-white/5 text-sm text-white/50">
+      <div className="grid aspect-video w-full place-items-center rounded-2xl border border-white/[0.07] bg-white/[0.03] text-sm text-chalk/50">
         Video needs a connection.
       </div>
     );
@@ -38,14 +39,23 @@ export function VideoEmbed({ id, title }: { id: string; title: string }) {
     <button
       onClick={() => setPlaying(true)}
       aria-label={`Play video: ${title}`}
-      className="group relative grid aspect-video w-full place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/[0.02] transition active:scale-[0.99]"
+      className="group relative grid aspect-video w-full place-items-center overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111215] transition active:scale-[0.99]"
     >
-      <span className="grid size-14 place-items-center rounded-full bg-white text-black shadow-lg transition group-active:scale-90">
-        <svg viewBox="0 0 24 24" className="ml-0.5 size-6" fill="currentColor" aria-hidden>
-          <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" />
-        </svg>
+      {/* A shop-light poster: a lamp pool over a dark floor, with film-strip sprocket edges. */}
+      <span
+        aria-hidden
+        className="absolute inset-0 opacity-80"
+        style={{ background: "radial-gradient(80% 70% at 50% 30%, rgb(243 241 236 / 0.12), transparent 70%)" }}
+      />
+      <span aria-hidden className="absolute inset-x-0 top-0 h-3 opacity-25" style={{ background: "repeating-linear-gradient(90deg, #f3f1ec 0 8px, transparent 8px 18px)", maskImage: "linear-gradient(#000 40%, transparent 41%)" }} />
+      <span aria-hidden className="absolute inset-x-0 bottom-0 h-3 opacity-25" style={{ background: "repeating-linear-gradient(90deg, #f3f1ec 0 8px, transparent 8px 18px)", maskImage: "linear-gradient(transparent 59%, #000 60%)" }} />
+      <span className="relative grid size-16 place-items-center rounded-full bg-chalk text-ink shadow-[0_12px_40px_-8px_rgb(243_241_236/0.45)] transition group-hover:scale-105 group-active:scale-90">
+        <IconPlay width={26} height={26} className="ml-1" />
       </span>
-      <span className="absolute inset-x-0 bottom-0 px-3 pb-2.5 text-left text-xs text-white/60">Watch how it&apos;s done</span>
+      <span className="absolute inset-x-0 bottom-0 flex items-end justify-between px-4 pb-4 text-left">
+        <span className="text-[14px] font-medium text-chalk/85">Watch it done</span>
+        <span className="text-[11px] text-chalk/40">Plays from YouTube</span>
+      </span>
     </button>
   );
 }
