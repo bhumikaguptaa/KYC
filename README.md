@@ -13,6 +13,7 @@ Website demo: https://kyc-hazel.vercel.app/
 - **Recall check.** Pulls open recall campaigns for your make, model and year from the NHTSA Recalls API.
 - **Interactive 3D car.** A Honda Civic model built with React Three Fiber, with clickable hotspots, camera fly-to animations and a custom X-ray shader to see inside the car.
 - **Quote breakdown.** Lists each line of a repair quote with its price, flags high prices and marks DIY-friendly repairs. Each line links to its part on the 3D car.
+- **Typical price ranges.** Checks quote lines against published Honda Civic prices for 11 common jobs (RepairPal, Kelley Blue Book, YourMechanic), shows the typical range under each price, and totals how far the quote is above typical. Data and matching rules live in `lib/prices.ts`.
 - **DIY guides.** Step-by-step how-tos, a tool list and an embedded video for each part.
 - **Installable PWA.** Opens full-screen from the home screen and works offline. The app shell and the 3D model are precached with Serwist.
 
@@ -47,6 +48,7 @@ frontend/
   lib/
     quote.ts        Shared quote types (QuoteItem, QuoteResponse)
     sample-quotes.ts Demo quotes
+    prices.ts       Typical price ranges and the rules that match quote lines to them
     guides.ts       DIY guide content
     server/ai.ts    Claude client, password gate, structured logging
 ```
@@ -73,6 +75,7 @@ npm run dev             # http://localhost:3000
 npm run build       # Next.js build + service worker
 npm run typecheck   # TypeScript check
 npm run lint        # ESLint
+npm test            # Unit tests (Vitest), about a second
 npm run analyze     # Bundle size report
 npm run model       # Compress the 3D car model (about 20 MB down to a few MB)
 ```
@@ -85,6 +88,7 @@ npm run model       # Compress the 3D car model (about 20 MB down to a few MB)
 ## Roadmap
 
 - Live PDF quote reading 
-- Local fair-price ranges for each repair
+- Local price ranges by ZIP code (today's ranges are national averages)
+- Price ranges for more jobs and more cars
 - More car models
 - Saved quotes and family sharing

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "analyze": "ANALYZE=true next build --webpack && serwist build serwist.config.mjs",
-    "model": "gltf-transform optimize \"${MODEL_SRC:-$HOME/Downloads/KYC-model/KYC_civic.glb}\" public/models/civic.v1.glb --compress meshopt --texture-compress webp --join false --flatten false --instance false --palette false --simplify false"
+    "model": "gltf-transform optimize \"${MODEL_SRC:-$HOME/Downloads/KYC-model/KYC_civic.glb}\" public/models/civic.v1.glb --compress meshopt --texture-compress webp --join false --flatten false --instance false --palette false --simplify false",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
@@ -39,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

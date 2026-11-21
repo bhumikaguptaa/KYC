@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { animate, m } from "motion/react";
 import { partById } from "@/lib/car";
 import { quoteStatus, type PartId, type QuoteItem, type QuoteStatus } from "@/lib/quote";
+import { isAboveTypical, overTypicalTotal, priceCheck } from "@/lib/prices";
 import { tick } from "@/lib/ui";
 
 export const usd = (n: number, cents = true) =>
@@ -55,7 +56,8 @@ export function QuoteSlip({
   const total = items.reduce((a, i) => a + i.amount, 0);
   const diyLines = items.filter((i) => i.canDIY);
   const diy = diyLines.reduce((a, i) => a + i.amount, 0);
-  const high = items.filter((i) => i.isHighPrice).length;
+  const high = items.filter((i) => isAboveTypical(i, vehicle)).length;
+  const overBy = overTypicalTotal(items, vehicle);
   const done = stamped >= items.length;
 
   // Stamp one line every 380 ms; a new quote (or leaving view) starts over.
@@ -114,6 +116,7 @@ export function QuoteSlip({
             <SlipLine
               key={item.index}
               item={item}
+              vehicle={vehicle}
               at={i}
               stamped={i < stamped}
               selected={!!item.relevantPart && selected === item.relevantPart}
@@ -138,6 +141,12 @@ export function QuoteSlip({
               </span>
             </div>
           )}
+          {overBy > 0 && (
+            <div className="flex justify-between text-[#1b1b1d]/70">
+              <span>ABOVE TYPICAL PRICES BY</span>
+              <span className="tabular-nums">{usd(overBy)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-[14px] font-bold text-[#12804a]">
             <span>YOU COULD DO YOURSELF</span>
             <span className="tabular-nums">{usd(diyShown)}</span>
@@ -146,6 +155,8 @@ export function QuoteSlip({
       )}
       <p className="mt-5 text-center text-[10px] leading-relaxed tracking-[0.14em] text-[#1b1b1d]/45">
         {sample ? "SAMPLE QUOTE · MADE-UP PRICES" : "AVERAGES ARE TYPICAL US SHOP PRICES FOR THE JOB"}
+        <br />
+        TYPICAL RANGES: REPAIRPAL, KELLEY BLUE BOOK, YOURMECHANIC (NOV 2026)
       </p>
     </div>
   );
@@ -153,6 +164,7 @@ export function QuoteSlip({
 
 function SlipLine({
   item,
+  vehicle,
   at,
   stamped,
   selected,
@@ -160,6 +172,7 @@ function SlipLine({
   onGuide,
 }: {
   item: QuoteItem;
+  vehicle?: string | null;
   at: number;
   stamped: boolean;
   selected: boolean;
@@ -169,6 +182,8 @@ function SlipLine({
   const part = partById(item.relevantPart);
   const pickable = !!(onPick && item.relevantPart);
   const stamp = STAMP[quoteStatus(item)];
+  const check = priceCheck(item, vehicle);
+  const above = check ? check.verdict === "above" : item.isHighPrice;
   // Picked from the car (a pin tap): bring the line into view.
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -252,7 +267,7 @@ function SlipLine({
         <div className="shrink-0 text-right">
           <span className="relative inline-block px-1 tabular-nums">
             {/* Yellow highlighter swiped over a price above the average. */}
-            {item.isHighPrice && (
+            {above && (
               <m.span
                 aria-hidden
                 className="absolute -inset-x-0.5 inset-y-[-1px] -skew-x-6 origin-left rounded-[2px] bg-[#ffe14d] mix-blend-multiply"
@@ -263,9 +278,20 @@ function SlipLine({
             )}
             <span className="relative">{usd(item.amount)}</span>
           </span>
-          {item.isHighPrice && (
+          {above && (
             <div className={`ml-auto mt-1 max-w-[5.5rem] text-[10px] font-semibold leading-tight tracking-[0.12em] text-[#1b1b1d]/70 transition-opacity duration-300 ${stamped ? "" : "opacity-0"}`}>
               ▲ ABOVE AVERAGE
+            </div>
+          )}
+          {check && (
+            <div
+              title={`${check.range.label}: ${check.range.source}`}
+              className="ml-auto mt-1 max-w-[5.5rem] text-[10px] leading-tight tracking-[0.08em] text-[#1b1b1d]/50"
+            >
+              TYPICAL{" "}
+              <span className="whitespace-nowrap">
+                {usd(check.range.low, false)} TO {usd(check.range.high, false)}
+              </span>
             </div>
           )}
         </div>

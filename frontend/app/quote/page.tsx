@@ -12,6 +12,7 @@ import { IconBack, IconReceipt } from "@/components/ui/icons";
 import { Lamp } from "@/components/ui/status";
 import { QUOTE_FIXTURE } from "@/lib/quote-fixture";
 import { quoteGlows } from "@/lib/quote";
+import { isSampleQuote } from "@/lib/sample-quotes";
 import { useScene } from "@/lib/scene-context";
 import { tick, useWide } from "@/lib/ui";
 
@@ -187,7 +188,7 @@ export default function QuotePage() {
                 <QuoteSlip
                   items={quote}
                   vehicle={vehicleLine}
-                  sample={quote === QUOTE_FIXTURE}
+                  sample={isSampleQuote(quote)}
                   selected={s.selected}
                   onPick={pick}
                   onGuide={(id) => router.push(`/garage?part=${id}&guide=1`)}

@@ -1,4 +1,5 @@
 import type { QuoteItem } from "./quote";
+import { QUOTE_FIXTURE } from "./quote-fixture";
 
 /**
  * Five made-up repair quotes. Uploading a PDF shows one of these: the PDF itself is not read
@@ -47,3 +48,15 @@ export const SAMPLE_QUOTES: QuoteItem[][] = [
     { index: 4, description: "Replace the serpentine belt, which is cracked", amount: 230, canDIY: false, isHighPrice: false, relevantPart: null },
   ],
 ];
+
+const SAMPLE_LINES = new Set([...SAMPLE_QUOTES.flat(), ...QUOTE_FIXTURE].map((item) => item.description));
+
+/**
+ * True when every line of a quote comes from the made-up samples, so the slip can say "SAMPLE"
+ * and "made-up prices". Today every upload shows a sample (lib/quote-client.ts), so this is what
+ * keeps a user's PDF from looking like it was really read. Once real PDF reading returns, real
+ * quotes stop matching and the label goes away by itself.
+ */
+export function isSampleQuote(items: QuoteItem[]) {
+  return items.length > 0 && items.every((item) => SAMPLE_LINES.has(item.description));
+}
