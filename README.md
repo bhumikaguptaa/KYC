@@ -4,7 +4,7 @@
 
 KYC helps young drivers make sense of a mechanic's quote. Enter your VIN, see your exact car in interactive 3D, check open recalls, and go through your repair quote line by line. You can see which repairs are overpriced, which ones you can do yourself, and where each part sits on your car.
 
-Built in 54 hours at **Techstars Startup Weekend KU (Nov 2026)**.
+Built in 54 hours at **Techstars Startup Weekend KU (Nov 2026)**, where it won **3rd place**.
 
 Website demo: https://kyc-hazel.vercel.app/ 
 ## Features
